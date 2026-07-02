@@ -1,0 +1,23 @@
+# Build output
+bin/
+obj/
+
+# WebView2 runtime data
+*.WebView2/
+
+# .NET
+*.user
+*.suo
+.vs/
+
+# Temp/working files
+.temp/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# IDE
+.idea/
+.vscode/

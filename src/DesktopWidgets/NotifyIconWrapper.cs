@@ -1,0 +1,79 @@
+using System.Drawing;
+using System.Windows;
+
+namespace DesktopWidgets;
+
+/// <summary>
+/// System tray icon with context menu.
+/// Note: Uses System.Drawing.Common for NotifyIcon (WinForms).
+/// </summary>
+public class NotifyIconWrapper : IDisposable
+{
+    private readonly System.Windows.Forms.NotifyIcon _notifyIcon;
+    private readonly MainWindow _mainWindow;
+
+    public NotifyIconWrapper(MainWindow mainWindow)
+    {
+        _mainWindow = mainWindow;
+
+        _notifyIcon = new System.Windows.Forms.NotifyIcon
+        {
+            Icon = CreateDefaultIcon(),
+            Text = "DesktopWidgets",
+            Visible = true
+        };
+
+        var menu = new System.Windows.Forms.ContextMenuStrip();
+        menu.Items.Add("Show / Hide", null, OnToggleVisibility);
+        menu.Items.Add("Toggle Click-Through", null, OnToggleClickThrough);
+        menu.Items.Add("Toggle Compact Mode", null, OnToggleCompact);
+        menu.Items.Add("-");
+        menu.Items.Add("Exit", null, OnExit);
+
+        _notifyIcon.ContextMenuStrip = menu;
+        _notifyIcon.DoubleClick += OnToggleVisibility;
+    }
+
+    private static Icon CreateDefaultIcon()
+    {
+        // Create a simple 16x16 blue circle icon programmatically
+        using var bmp = new Bitmap(16, 16);
+        using var g = Graphics.FromImage(bmp);
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        g.Clear(Color.Transparent);
+        g.FillEllipse(Brushes.DodgerBlue, 1, 1, 14, 14);
+        g.FillEllipse(Brushes.White, 5, 5, 6, 6);
+        var hIcon = bmp.GetHicon();
+        return Icon.FromHandle(hIcon);
+    }
+
+    private void OnToggleVisibility(object? sender, EventArgs e)
+    {
+        if (_mainWindow.IsVisible)
+            _mainWindow.Hide();
+        else
+            _mainWindow.ShowWindow();
+    }
+
+    private void OnToggleClickThrough(object? sender, EventArgs e)
+    {
+        _mainWindow.ToggleClickThrough();
+    }
+
+    private void OnToggleCompact(object? sender, EventArgs e)
+    {
+        _mainWindow.ToggleCompactMode();
+    }
+
+    private void OnExit(object? sender, EventArgs e)
+    {
+        _notifyIcon.Visible = false;
+        System.Windows.Application.Current.Shutdown();
+    }
+
+    public void Dispose()
+    {
+        _notifyIcon.Visible = false;
+        _notifyIcon.Dispose();
+    }
+}

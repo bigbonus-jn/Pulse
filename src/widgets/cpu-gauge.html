@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: transparent;
+    overflow: hidden;
+    user-select: none;
+    cursor: default;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  @keyframes scanline {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100vh); }
+  }
+  @keyframes flicker {
+    0%, 100% { opacity: 1; }
+    92% { opacity: 1; }
+    93% { opacity: 0.8; }
+    94% { opacity: 1; }
+  }
+  @keyframes glitch {
+    0%, 100% { clip-path: inset(0 0 0 0); }
+    20% { clip-path: inset(2px 0 0 0); }
+    40% { clip-path: inset(0 0 2px 0); }
+    60% { clip-path: inset(1px 0 0 0); }
+    80% { clip-path: inset(0 0 1px 0); }
+  }
+
+  .widget {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: rgb(10, 10, 20);
+    border: 1px solid rgba(0, 255, 249, 0.15);
+    position: relative;
+    animation: flicker 8s infinite;
+  }
+
+  /* Scanline overlay */
+  .widget::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(to bottom, transparent, rgba(0,255,249,0.04), transparent);
+    animation: scanline 4s linear infinite;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* Top bar */
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(0,255,249,0.1);
+    flex-shrink: 0;
+  }
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dot {
+    width: 5px; height: 5px;
+    border-radius: 1px;
+  }
+  .dot-cyan { background: #00fff9; box-shadow: 0 0 4px #00fff9; }
+  .dot-magenta { background: #ff2a6d; box-shadow: 0 0 4px #ff2a6d; }
+  .dot-yellow { background: #ffd700; box-shadow: 0 0 4px #ffd700; }
+  .sys-tag {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(0,255,249,0.5);
+    text-transform: uppercase;
+  }
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .date-label {
+    font-family: 'Consolas', monospace;
+    font-size: 10px;
+    color: rgba(0,255,249,0.75);
+    letter-spacing: 1px;
+  }
+  .toggle-btn {
+    width: 18px; height: 18px;
+    border: 1px solid rgba(0,255,249,0.4);
+    border-radius: 1px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .toggle-btn:hover {
+    border-color: rgba(0,255,249,0.9);
+    background: rgba(0,255,249,0.08);
+  }
+  .toggle-btn .icon {
+    font-family: 'Consolas', monospace;
+    font-size: 10px;
+    color: rgba(0,255,249,0.7);
+    line-height: 1;
+  }
+  .compact-mode .metric-value {
+    display: none !important;
+  }
+  .compact-mode .metric-label-row {
+    justify-content: flex-start;
+  }
+  .compact-mode .metric {
+    gap: 2px;
+  }
+  /* In compact mode: label + bar on same line */
+  .compact-mode .metric-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
+  .compact-mode .bar-track {
+    flex: 1;
+  }
+  .compact-mode .net-val {
+    display: none !important;
+  }
+  .compact-mode .net-tag-up,
+  .compact-mode .net-tag-dn {
+    display: none !important;
+  }
+  .compact-mode .net-bars {
+    flex: 1;
+    flex-direction: row;
+    gap: 4px;
+  }
+  .compact-mode .net-sub {
+    flex-direction: row;
+    align-items: center;
+    gap: 3px;
+  }
+  .compact-mode .net-bar-compact {
+    flex: 1;
+  }
+
+  /* Content */
+  .content {
+    flex: 1;
+    padding: 8px 10px 6px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    overflow: hidden;
+  }
+
+  /* Metric row */
+  .metric {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .metric-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .metric-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .metric-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .metric-label {
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  .metric-label-cyan { color: #00fff9; }
+  .metric-label-magenta { color: #ff2a6d; }
+  .metric-label-yellow { color: #ffd700; }
+  .metric-label-white { color: rgba(255,255,255,0.85); }
+
+  .metric-value {
+    font-family: 'Consolas', monospace;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+  }
+  .metric-value-cyan { color: #00fff9; text-shadow: 0 0 6px rgba(0,255,249,0.3); }
+  .metric-value-magenta { color: #ff2a6d; text-shadow: 0 0 6px rgba(255,42,109,0.3); }
+  .metric-value-yellow { color: #ffd700; text-shadow: 0 0 6px rgba(255,215,0,0.3); }
+  .metric-value-white { color: rgba(255,255,255,0.9); }
+
+  /* Segmented bar */
+  .bar-track {
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,0.04);
+    position: relative;
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  }
+  .bar-fill {
+    height: 100%;
+    transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+    position: relative;
+  }
+  .bar-fill-cyan {
+    background: linear-gradient(90deg, #00fff9, #05d9e8);
+    box-shadow: 0 0 8px rgba(0,255,249,0.25);
+  }
+  .bar-fill-magenta {
+    background: linear-gradient(90deg, #ff2a6d, #d1003e);
+    box-shadow: 0 0 8px rgba(255,42,109,0.25);
+  }
+  .bar-fill-yellow {
+    background: linear-gradient(90deg, #ffd700, #ff9500);
+    box-shadow: 0 0 8px rgba(255,215,0,0.25);
+  }
+  .bar-fill-green {
+    background: linear-gradient(90deg, #39ff14, #32cd32);
+    box-shadow: 0 0 8px rgba(57,255,20,0.25);
+  }
+  .bar-fill-orange {
+    background: linear-gradient(90deg, #ff8c00, #ff6600);
+    box-shadow: 0 0 8px rgba(255,140,0,0.25);
+  }
+
+  /* Segmented markers (tick marks) */
+  .bar-ticks {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    pointer-events: none;
+  }
+  .bar-tick {
+    flex: 1;
+    border-right: 1px solid rgba(0,255,249,0.06);
+  }
+  .bar-tick:last-child { border-right: none; }
+
+  /* Bottom bar */
+  .bottombar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 10px;
+    border-top: 1px solid rgba(0,255,249,0.08);
+    flex-shrink: 0;
+  }
+  .bottombar-left {
+    font-family: 'Consolas', monospace;
+    font-size: 9px;
+    color: rgba(255,255,255,0.15);
+    letter-spacing: 1px;
+  }
+  .bottombar-right {
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+    color: rgba(0,255,249,0.75);
+    letter-spacing: 1px;
+  }
+
+  /* Net sub-elements */
+  .net-bars {
+    display: flex;
+    gap: 6px;
+  }
+  .net-sub {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .net-tag-up {
+    font-family: Consolas, monospace;
+    font-size: 9px;
+    color: rgba(57,255,20,0.7);
+    letter-spacing: 1px;
+  }
+  .net-tag-dn {
+    font-family: Consolas, monospace;
+    font-size: 9px;
+    color: rgba(255,140,0,0.7);
+    letter-spacing: 1px;
+  }
+  .net-bar-compact {
+    height: 6px;
+  }
+
+  /* Corner brackets */
+  .corner {
+    position: absolute;
+    width: 12px; height: 12px;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .corner-tl { top: 0; left: 0; border-top: 1px solid #00fff9; border-left: 1px solid #00fff9; }
+  .corner-tr { top: 0; right: 0; border-top: 1px solid #00fff9; border-right: 1px solid #00fff9; }
+  .corner-bl { bottom: 0; left: 0; border-bottom: 1px solid #00fff9; border-left: 1px solid #00fff9; }
+  .corner-br { bottom: 0; right: 0; border-bottom: 1px solid #00fff9; border-right: 1px solid #00fff9; }
+</style>
+</head>
+<body>
+<div class="widget">
+  <div class="corner corner-tl"></div>
+  <div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div>
+  <div class="corner corner-br"></div>
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="dot dot-cyan"></div>
+      <div class="dot dot-magenta"></div>
+      <div class="dot dot-yellow"></div>
+      <span class="sys-tag">SysMon</span>
+    </div>
+    <div class="topbar-right">
+      <span class="date-label" id="dateLabel">----/--/--</span>
+      <div class="toggle-btn" id="compactToggle" title="Toggle compact mode">
+        <span class="icon">▣</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- CPU -->
+    <div class="metric">
+      <div class="metric-row">
+        <div class="metric-label-row">
+          <span class="metric-label metric-label-cyan">CPU</span>
+          <span class="metric-value metric-value-cyan" id="cpuVal">--%</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill bar-fill-cyan" id="cpuFill" style="width:0%"></div>
+          <div class="bar-ticks">
+            <div class="bar-tick"></div><div class="bar-tick"></div><div class="bar-tick"></div>
+            <div class="bar-tick"></div><div class="bar-tick"></div><div class="bar-tick"></div>
+            <div class="bar-tick"></div><div class="bar-tick"></div><div class="bar-tick"></div>
+            <div class="bar-tick"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RAM -->
+    <div class="metric">
+      <div class="metric-row">
+        <div class="metric-label-row">
+          <span class="metric-label metric-label-magenta">RAM</span>
+          <span class="metric-value metric-value-magenta" id="ramVal">--</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill bar-fill-magenta" id="ramFill" style="width:0%"></div>
+          <div class="bar-ticks">
+            <div class="bar-tick"></div><div class="bar-tick"></div><div class="bar-tick"></div>
+            <div class="bar-tick"></div><div class="bar-tick"></div><div class="bar-tick"></div>
+            <div class="bar-tick"></div><div class="bar-tick"></div><div class="bar-tick"></div>
+            <div class="bar-tick"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GPU -->
+    <div class="metric">
+      <div class="metric-row">
+        <div class="metric-label-row">
+          <span class="metric-label metric-label-yellow">GPU</span>
+          <span class="metric-value metric-value-yellow" id="gpuVal">N/A</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill bar-fill-yellow" id="gpuFill" style="width:0%"></div>
+          <div class="bar-ticks">
+            <div class="bar-tick"></div><div class="bar-tick"></div><div class="bar-tick"></div>
+            <div class="bar-tick"></div><div class="bar-tick"></div><div class="bar-tick"></div>
+            <div class="bar-tick"></div><div class="bar-tick"></div><div class="bar-tick"></div>
+            <div class="bar-tick"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Network -->
+    <div class="metric">
+      <div class="metric-row">
+        <div class="metric-label-row">
+          <span class="metric-label metric-label-white">NET</span>
+          <span class="metric-value metric-value-white net-val" id="netVal">0 / 0</span>
+        </div>
+        <div class="net-bars">
+          <div class="net-sub">
+            <span class="net-tag-up">UP</span>
+            <div class="bar-track net-bar-compact">
+              <div class="bar-fill bar-fill-green" id="netUpFill" style="width:0%;opacity:0.8"></div>
+            </div>
+          </div>
+          <div class="net-sub">
+            <span class="net-tag-dn">DN</span>
+            <div class="bar-track net-bar-compact">
+              <div class="bar-fill bar-fill-orange" id="netDnFill" style="width:0%;opacity:0.8"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottombar">
+    <div class="bottombar-left">v0.1</div>
+    <div class="bottombar-right" id="clockLabel">--:--:--</div>
+  </div>
+</div>
+
+<script>
+const cpuVal = document.getElementById('cpuVal');
+const cpuFill = document.getElementById('cpuFill');
+const ramVal = document.getElementById('ramVal');
+const ramFill = document.getElementById('ramFill');
+const gpuVal = document.getElementById('gpuVal');
+const gpuFill = document.getElementById('gpuFill');
+const netVal = document.getElementById('netVal');
+const dateLabel = document.getElementById('dateLabel');
+const clockLabel = document.getElementById('clockLabel');
+
+// Compact mode toggle
+let isCompact = false;
+const widget = document.querySelector('.widget');
+const compactToggle = document.getElementById('compactToggle');
+
+function toggleCompactFromCS() {
+  isCompact = !isCompact;
+  widget.classList.toggle('compact-mode', isCompact);
+  compactToggle.querySelector('.icon').textContent = isCompact ? '▣' : '▫';
+}
+
+compactToggle.addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleCompactFromCS();
+  // Flash the border to confirm click registered
+  widget.style.borderColor = 'rgba(0,255,249,0.8)';
+  setTimeout(() => { widget.style.borderColor = ''; }, 300);
+});
+
+// Drag support: topbar mousedown → notify C# to start window drag
+const topbar = document.querySelector('.topbar');
+topbar.addEventListener('mousedown', (e) => {
+  // Don't start drag if clicking the compact toggle button
+  if (e.target.closest('.toggle-btn')) return;
+  window.chrome.webview.postMessage('startDrag');
+});
+
+function updateData(data) {
+  // CPU
+  const cpu = Math.min(100, Math.max(0, data.cpu));
+  cpuVal.textContent = cpu.toFixed(1) + '%';
+  cpuFill.style.width = cpu + '%';
+  // CPU color shift at high load
+  if (cpu > 80) {
+    cpuFill.className = 'bar-fill bar-fill-magenta';
+    cpuVal.className = 'metric-value metric-value-magenta';
+  } else {
+    cpuFill.className = 'bar-fill bar-fill-cyan';
+    cpuVal.className = 'metric-value metric-value-cyan';
+  }
+
+  // RAM
+  const mem = Math.min(100, Math.max(0, data.memory));
+  const usedGB = (data.memoryUsed / 1024).toFixed(1);
+  const totalGB = (data.memoryTotal / 1024).toFixed(1);
+  ramVal.textContent = usedGB + '/' + totalGB + ' GB';
+  ramFill.style.width = mem + '%';
+  if (mem > 85) {
+    ramFill.className = 'bar-fill bar-fill-yellow';
+    ramVal.className = 'metric-value metric-value-yellow';
+  } else {
+    ramFill.className = 'bar-fill bar-fill-magenta';
+    ramVal.className = 'metric-value metric-value-magenta';
+  }
+
+  // GPU
+  const gpu = data.gpu || 0;
+  if (data.gpuName && data.gpuName !== 'N/A') {
+    gpuVal.textContent = gpu.toFixed(0) + '%';
+    gpuFill.style.width = gpu + '%';
+  } else {
+    gpuVal.textContent = 'N/A';
+    gpuFill.style.width = '0%';
+  }
+
+  // Network
+  const netUp = data.netUp || 0;
+  const netDown = data.netDown || 0;
+  // Format: show KB/s or MB/s
+  function fmtSpeed(kbps) {
+    if (kbps >= 1024) return (kbps / 1024).toFixed(1) + ' MB/s';
+    return kbps.toFixed(1) + ' KB/s';
+  }
+  netVal.textContent = fmtSpeed(netUp) + ' / ' + fmtSpeed(netDown);
+  // Net bars - scale relative to 10 MB/s max
+  const netMax = 10240; // 10 MB/s in KB/s
+  const netUpFill = document.getElementById('netUpFill');
+  const netDnFill = document.getElementById('netDnFill');
+  if (netUpFill) netUpFill.style.width = Math.min(100, (netUp / netMax) * 100) + '%';
+  if (netDnFill) netDnFill.style.width = Math.min(100, (netDown / netMax) * 100) + '%';
+
+  // Date & Time
+  if (data.date) dateLabel.textContent = data.date;
+  if (data.time) clockLabel.textContent = data.time;
+}
+
+window.chrome.webview.addEventListener('message', event => {
+  try {
+    const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+    if (data.type === 'systemData') {
+      updateData(data);
+    }
+  } catch (e) {}
+});
+
+function sendCommand(cmd) {
+  window.chrome.webview.postMessage(cmd);
+}
+</script>
+</body>
+</html>
