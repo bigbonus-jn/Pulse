@@ -42,7 +42,7 @@ public partial class MainWindow : Window
     private static readonly SolidColorBrush RedText = new(System.Windows.Media.Color.FromRgb(0xFF, 0x55, 0x55));
     private static readonly SolidColorBrush TealText = new(System.Windows.Media.Color.FromRgb(0x00, 0xCE, 0xD1));
 
-    // LibreHardwareMonitor for CPU temperature
+    // LibreHardwareMonitor for CPU/GPU temperature
     private readonly Computer _computer;
 
     // Win32 API
@@ -67,8 +67,8 @@ public partial class MainWindow : Window
         Width = _config.Data.Width;
         Height = _config.Data.Height;
 
-        // Initialize LibreHardwareMonitor for CPU temperature
-        _computer = new Computer { IsCpuEnabled = true, IsStorageEnabled = true };
+        // Initialize LibreHardwareMonitor for CPU/GPU temperature
+        _computer = new Computer { IsCpuEnabled = true, IsGpuEnabled = true, IsStorageEnabled = true };
         try { _computer.Open(); } catch { }
     }
 
@@ -146,7 +146,6 @@ public partial class MainWindow : Window
         RamValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         GpuValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         NetValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
-        DiskValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         TempValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         ProcValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
 
@@ -154,14 +153,16 @@ public partial class MainWindow : Window
         NetUpTag.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         NetDnTag.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
 
+        // TEMP tags
+        TempCpuTag.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+        TempGpuTag.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+
         if (_isCompact)
         {
             // Compact: switch each Grid to 2-column layout [label | bar]
             SetMetricGridCompact(CpuSection, CpuHeaderRow, CpuBarContainer, CpuLabel);
             SetMetricGridCompact(RamSection, RamHeaderRow, RamBarContainer, RamLabel);
             SetMetricGridCompact(GpuSection, GpuHeaderRow, GpuBarContainer, GpuLabel);
-            SetMetricGridCompact(DiskSection, DiskHeaderRow, DiskBarContainer, DiskLabel);
-            SetMetricGridCompact(TempSection, TempHeaderRow, TempBarContainer, TempLabel);
             SetMetricGridCompact(ProcSection, ProcHeaderRow, ProcBarContainer, ProcLabel);
 
             // NET: label left, bars right
@@ -175,11 +176,21 @@ public partial class MainWindow : Window
             NetUpBarContainer.Height = 5; NetDnBarContainer.Height = 5;
             NetLabel.FontSize = 9;
 
+            // TEMP: label left, bars right (same as NET)
+            TempSection.ColumnDefinitions.Clear();
+            TempSection.RowDefinitions.Clear();
+            TempSection.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(34) });
+            TempSection.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            System.Windows.Controls.Grid.SetColumn(TempHeaderRow, 0); System.Windows.Controls.Grid.SetRow(TempHeaderRow, 0);
+            System.Windows.Controls.Grid.SetColumn(TempBarsGrid, 1); System.Windows.Controls.Grid.SetRow(TempBarsGrid, 0);
+            TempBarsGrid.Margin = new Thickness(4, 1, 0, 0);
+            TempCpuBarContainer.Height = 5; TempGpuBarContainer.Height = 5;
+            TempLabel.FontSize = 9;
+
             CpuSection.Margin = new Thickness(0, 0, 0, 2);
             RamSection.Margin = new Thickness(0, 0, 0, 2);
             GpuSection.Margin = new Thickness(0, 0, 0, 2);
             NetSection.Margin = new Thickness(0, 0, 0, 2);
-            DiskSection.Margin = new Thickness(0, 0, 0, 2);
             TempSection.Margin = new Thickness(0, 0, 0, 2);
             ProcSection.Margin = new Thickness(0, 0, 0, 0);
         }
@@ -189,8 +200,6 @@ public partial class MainWindow : Window
             SetMetricGridNormal(CpuSection, CpuHeaderRow, CpuBarContainer, CpuLabel);
             SetMetricGridNormal(RamSection, RamHeaderRow, RamBarContainer, RamLabel);
             SetMetricGridNormal(GpuSection, GpuHeaderRow, GpuBarContainer, GpuLabel);
-            SetMetricGridNormal(DiskSection, DiskHeaderRow, DiskBarContainer, DiskLabel);
-            SetMetricGridNormal(TempSection, TempHeaderRow, TempBarContainer, TempLabel);
             SetMetricGridNormal(ProcSection, ProcHeaderRow, ProcBarContainer, ProcLabel);
 
             // NET: restore
@@ -204,11 +213,21 @@ public partial class MainWindow : Window
             NetUpBarContainer.Height = 6; NetDnBarContainer.Height = 6;
             NetLabel.FontSize = 11;
 
+            // TEMP: restore
+            TempSection.ColumnDefinitions.Clear();
+            TempSection.RowDefinitions.Clear();
+            TempSection.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+            TempSection.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+            System.Windows.Controls.Grid.SetColumn(TempHeaderRow, 0); System.Windows.Controls.Grid.SetRow(TempHeaderRow, 0);
+            System.Windows.Controls.Grid.SetColumn(TempBarsGrid, 0); System.Windows.Controls.Grid.SetRow(TempBarsGrid, 1);
+            TempBarsGrid.Margin = new Thickness(0, 3, 0, 0);
+            TempCpuBarContainer.Height = 6; TempGpuBarContainer.Height = 6;
+            TempLabel.FontSize = 11;
+
             CpuSection.Margin = new Thickness(0, 0, 0, 7);
             RamSection.Margin = new Thickness(0, 0, 0, 7);
             GpuSection.Margin = new Thickness(0, 0, 0, 7);
             NetSection.Margin = new Thickness(0, 0, 0, 7);
-            DiskSection.Margin = new Thickness(0, 0, 0, 7);
             TempSection.Margin = new Thickness(0, 0, 0, 7);
             ProcSection.Margin = new Thickness(0, 0, 0, 0);
         }
@@ -394,35 +413,26 @@ public partial class MainWindow : Window
 
     private void UpdateSlowMetrics()
     {
-        // DISK
-        double diskPercent = 0;
-        string diskInfo = "N/A";
-        try
-        {
-            var drive = System.IO.DriveInfo.GetDrives()
-                .FirstOrDefault(d => d.IsReady && d.RootDirectory.FullName == "C:\\");
-            if (drive != null)
-            {
-                double diskTotalGB = Math.Round(drive.TotalSize / (1024.0 * 1024 * 1024), 0);
-                double diskUsedGB = Math.Round((drive.TotalSize - drive.AvailableFreeSpace) / (1024.0 * 1024 * 1024), 1);
-                diskPercent = Math.Round((1.0 - (double)drive.AvailableFreeSpace / drive.TotalSize) * 100, 1);
-                diskInfo = $"{diskUsedGB:F0}/{diskTotalGB:F0} GB";
-            }
-        }
-        catch { }
-        DiskValue.Text = diskInfo;
-        DiskValue.Foreground = diskPercent > 90 ? RedText : PurpleText;
-        DiskFill.Width = (diskPercent / 100.0) * DiskBarContainer.ActualWidth;
-        if (diskPercent > 90)
-            DiskFill.Fill = FindResource("RedBar") as System.Windows.Media.Brush;
-        else
-            DiskFill.Fill = FindResource("PurpleBar") as System.Windows.Media.Brush;
+        // DISK (reserved — data collection kept for future re-enable)
+        // double diskPercent = 0;
+        // string diskInfo = "N/A";
+        // try
+        // {
+        //     var drive = System.IO.DriveInfo.GetDrives()
+        //         .FirstOrDefault(d => d.IsReady && d.RootDirectory.FullName == "C:\\");
+        //     if (drive != null)
+        //     {
+        //         double diskTotalGB = Math.Round(drive.TotalSize / (1024.0 * 1024 * 1024), 0);
+        //         double diskUsedGB = Math.Round((drive.TotalSize - drive.AvailableFreeSpace) / (1024.0 * 1024 * 1024), 1);
+        //         diskPercent = Math.Round((1.0 - (double)drive.AvailableFreeSpace / drive.TotalSize) * 100, 1);
+        //         diskInfo = $"{diskUsedGB:F0}/{diskTotalGB:F0} GB";
+        //     }
+        // }
+        // catch { }
 
-        // TEMP (temperature via LibreHardwareMonitor)
-        // Priority: CPU Package → CPU any core → Storage composite → any Temperature
-        double tempValue = 0;
-        bool tempAvailable = false;
-        string tempSource = "";
+        // TEMP (CPU / GPU dual temperature via LibreHardwareMonitor)
+        double cpuTemp = 0; bool cpuTempAvailable = false;
+        double gpuTemp = 0; bool gpuTempAvailable = false;
         try
         {
             foreach (var hardware in _computer.Hardware)
@@ -433,80 +443,98 @@ public partial class MainWindow : Window
                     if (sensor.SensorType != SensorType.Temperature || !sensor.Value.HasValue)
                         continue;
 
-                    // Priority 1: CPU Package
-                    if (hardware.HardwareType == HardwareType.Cpu &&
-                        sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase))
+                    // CPU temperature: Package → any core → any CPU temp
+                    if (hardware.HardwareType == HardwareType.Cpu && !cpuTempAvailable)
                     {
-                        tempValue = Math.Round(sensor.Value.Value, 0);
-                        tempAvailable = true;
-                        tempSource = "CPU";
-                        break;
-                    }
-
-                    // Priority 2: CPU any core (first one with value)
-                    if (hardware.HardwareType == HardwareType.Cpu && !tempAvailable)
-                    {
-                        // Skip "Distance to TjMax" sensors
-                        if (sensor.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase))
-                            continue;
-                        if (string.IsNullOrEmpty(tempSource))
+                        if (sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase))
                         {
-                            tempValue = Math.Round(sensor.Value.Value, 0);
-                            tempAvailable = true;
-                            tempSource = "CPU";
+                            cpuTemp = Math.Round(sensor.Value.Value, 0);
+                            cpuTempAvailable = true;
+                        }
+                        else if (!sensor.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase))
+                        {
+                            cpuTemp = Math.Round(sensor.Value.Value, 0);
+                            cpuTempAvailable = true;
                         }
                     }
 
-                    // Priority 3: Storage composite temperature
-                    if (hardware.HardwareType == HardwareType.Storage &&
-                        sensor.Name.Contains("Composite", StringComparison.OrdinalIgnoreCase) &&
-                        !tempAvailable)
+                    // GPU temperature: GpuCore → any GPU temp
+                    if (hardware.HardwareType == HardwareType.GpuNvidia ||
+                        hardware.HardwareType == HardwareType.GpuAmd ||
+                        hardware.HardwareType == HardwareType.GpuIntel)
                     {
-                        tempValue = Math.Round(sensor.Value.Value, 0);
-                        tempAvailable = true;
-                        tempSource = "SSD";
+                        if (!gpuTempAvailable)
+                        {
+                            if (sensor.Name.Contains("Core", StringComparison.OrdinalIgnoreCase))
+                            {
+                                gpuTemp = Math.Round(sensor.Value.Value, 0);
+                                gpuTempAvailable = true;
+                            }
+                            else if (!sensor.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase))
+                            {
+                                gpuTemp = Math.Round(sensor.Value.Value, 0);
+                                gpuTempAvailable = true;
+                            }
+                        }
                     }
                 }
-                if (tempAvailable && tempSource == "CPU") break;
             }
 
-            // Priority 4: any temperature at all
-            if (!tempAvailable)
+            // CPU temp fallback: Storage composite → any Temperature
+            if (!cpuTempAvailable)
             {
                 foreach (var hardware in _computer.Hardware)
                 {
                     foreach (var sensor in hardware.Sensors)
                     {
-                        if (sensor.SensorType == SensorType.Temperature && sensor.Value.HasValue)
+                        if (sensor.SensorType == SensorType.Temperature && sensor.Value.HasValue && !cpuTempAvailable)
                         {
-                            tempValue = Math.Round(sensor.Value.Value, 0);
-                            tempAvailable = true;
-                            tempSource = hardware.HardwareType == HardwareType.Storage ? "SSD" : "SYS";
+                            cpuTemp = Math.Round(sensor.Value.Value, 0);
+                            cpuTempAvailable = true;
                             break;
                         }
                     }
-                    if (tempAvailable) break;
+                    if (cpuTempAvailable) break;
                 }
             }
         }
         catch { }
-        TempLabel.Text = tempAvailable ? $"TEMP" : "TEMP";
-        TempValue.Text = tempAvailable ? $"{tempValue:F0}°C" : "N/A";
-        if (tempAvailable)
+
+        // Update TEMP display
+        string cpuTempStr = cpuTempAvailable ? $"{cpuTemp:F0}°" : "N/A";
+        string gpuTempStr = gpuTempAvailable ? $"{gpuTemp:F0}°" : "N/A";
+        TempValue.Text = $"{cpuTempStr} / {gpuTempStr}";
+
+        // CPU temp bar
+        if (cpuTempAvailable && TempCpuBarContainer.ActualWidth > 0)
         {
-            TempValue.Foreground = tempValue > 80 ? RedText : tempValue > 60 ? YellowText : CyanText;
-            TempFill.Width = (tempValue / 100.0) * TempBarContainer.ActualWidth;
-            if (tempValue > 80)
-                TempFill.Fill = FindResource("RedBar") as System.Windows.Media.Brush;
-            else if (tempValue > 60)
-                TempFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
+            TempCpuFill.Width = (cpuTemp / 100.0) * TempCpuBarContainer.ActualWidth;
+            if (cpuTemp > 80)
+                TempCpuFill.Fill = FindResource("RedBar") as System.Windows.Media.Brush;
+            else if (cpuTemp > 60)
+                TempCpuFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
             else
-                TempFill.Fill = FindResource("CyanBar") as System.Windows.Media.Brush;
+                TempCpuFill.Fill = FindResource("CyanBar") as System.Windows.Media.Brush;
         }
         else
         {
-            TempValue.Foreground = RedText;
-            TempFill.Width = 0;
+            TempCpuFill.Width = 0;
+        }
+
+        // GPU temp bar
+        if (gpuTempAvailable && TempGpuBarContainer.ActualWidth > 0)
+        {
+            TempGpuFill.Width = (gpuTemp / 100.0) * TempGpuBarContainer.ActualWidth;
+            if (gpuTemp > 80)
+                TempGpuFill.Fill = FindResource("RedBar") as System.Windows.Media.Brush;
+            else if (gpuTemp > 60)
+                TempGpuFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
+            else
+                TempGpuFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
+        }
+        else
+        {
+            TempGpuFill.Width = 0;
         }
 
         // PROC (process count)

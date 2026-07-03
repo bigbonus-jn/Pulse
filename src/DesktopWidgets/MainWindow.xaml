@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="DesktopWidgets"
-        Width="260" Height="500"
+        Width="260" Height="460"
         WindowStyle="None"
         Background="#0A0A14"
         Topmost="True"
@@ -152,7 +152,7 @@
                 <!-- Bottom bar -->
                 <DockPanel DockPanel.Dock="Bottom" Height="22">
                     <Border DockPanel.Dock="Top" Height="1" Background="#1400FFF9"/>
-                    <TextBlock Text="v0.5" FontFamily="Consolas" FontSize="9"
+                    <TextBlock Text="v0.6" FontFamily="Consolas" FontSize="9"
                                Foreground="#26FFFFFF"
                                VerticalAlignment="Center" Margin="10,0,0,0"/>
                      <TextBlock x:Name="ClockLabel" Text="--:--:--"
@@ -309,7 +309,49 @@
                          </Grid>
                      </Grid>
 
-                     <!-- DISK -->
+                     <!-- TEMP (CPU / GPU dual temperature, like NET UP/DN layout) -->
+                     <Grid x:Name="TempSection" Margin="0,0,0,7">
+                         <Grid.RowDefinitions>
+                             <RowDefinition Height="Auto"/>
+                             <RowDefinition Height="Auto"/>
+                         </Grid.RowDefinitions>
+                         <DockPanel x:Name="TempHeaderRow" Grid.Row="0">
+                              <TextBlock x:Name="TempLabel" Text="TEMP" FontFamily="Consolas"
+                                         FontSize="11" FontWeight="Bold" Foreground="#FF5555"
+                                         Effect="{StaticResource RedGlow}"/>
+                              <TextBlock x:Name="TempValue" Text="N/A" FontFamily="Consolas"
+                                         FontSize="13" Foreground="#E6FFFFFF"
+                                         HorizontalAlignment="Right"
+                                         Effect="{StaticResource WhiteGlow}"/>
+                         </DockPanel>
+                         <Grid Grid.Row="1" Margin="0,3,0,0" x:Name="TempBarsGrid">
+                             <Grid.ColumnDefinitions>
+                                 <ColumnDefinition Width="*"/>
+                                 <ColumnDefinition Width="6"/>
+                                 <ColumnDefinition Width="*"/>
+                             </Grid.ColumnDefinitions>
+                             <StackPanel Grid.Column="0">
+                                 <TextBlock x:Name="TempCpuTag" Text="CPU" FontFamily="Consolas"
+                                            FontSize="9" Foreground="#B300FFF9" Margin="0,0,0,2"/>
+                                 <Grid x:Name="TempCpuBarContainer" Height="6">
+                                     <Border Background="{StaticResource BarTrack}"/>
+                                     <Rectangle x:Name="TempCpuFill" HorizontalAlignment="Left" Width="0"
+                                                Fill="{StaticResource CyanBar}" Opacity="0.8"/>
+                                 </Grid>
+                             </StackPanel>
+                             <StackPanel Grid.Column="2">
+                                 <TextBlock x:Name="TempGpuTag" Text="GPU" FontFamily="Consolas"
+                                            FontSize="9" Foreground="#B3FFD700" Margin="0,0,0,2"/>
+                                 <Grid x:Name="TempGpuBarContainer" Height="6">
+                                     <Border Background="{StaticResource BarTrack}"/>
+                                     <Rectangle x:Name="TempGpuFill" HorizontalAlignment="Left" Width="0"
+                                                Fill="{StaticResource YellowBar}" Opacity="0.8"/>
+                                 </Grid>
+                             </StackPanel>
+                         </Grid>
+                     </Grid>
+
+                     <!-- DISK (reserved, hidden for now. Uncomment to re-enable)
                      <Grid x:Name="DiskSection" Margin="0,0,0,7">
                          <Grid.RowDefinitions>
                              <RowDefinition Height="Auto"/>
@@ -319,7 +361,7 @@
                               <TextBlock x:Name="DiskLabel" Text="DISK" FontFamily="Consolas"
                                          FontSize="11" FontWeight="Bold" Foreground="#BD93F9"
                                          Effect="{StaticResource PurpleGlow}"/>
-                              <TextBlock x:Name="DiskValue" Text="--" FontFamily="Consolas"
+                              <TextBlock x:Name="DiskValue" Text="N/A" FontFamily="Consolas"
                                          FontSize="13" Foreground="#BD93F9"
                                          HorizontalAlignment="Right"
                                          Effect="{StaticResource PurpleGlow}"/>
@@ -342,40 +384,7 @@
                              </UniformGrid>
                          </Grid>
                      </Grid>
-
-                     <!-- TEMP -->
-                     <Grid x:Name="TempSection" Margin="0,0,0,7">
-                         <Grid.RowDefinitions>
-                             <RowDefinition Height="Auto"/>
-                             <RowDefinition Height="Auto"/>
-                         </Grid.RowDefinitions>
-                         <DockPanel x:Name="TempHeaderRow" Grid.Row="0">
-                              <TextBlock x:Name="TempLabel" Text="TEMP" FontFamily="Consolas"
-                                         FontSize="11" FontWeight="Bold" Foreground="#FF5555"
-                                         Effect="{StaticResource RedGlow}"/>
-                              <TextBlock x:Name="TempValue" Text="N/A" FontFamily="Consolas"
-                                         FontSize="13" Foreground="#FF5555"
-                                         HorizontalAlignment="Right"
-                                         Effect="{StaticResource RedGlow}"/>
-                         </DockPanel>
-                         <Grid x:Name="TempBarContainer" Grid.Row="1" Height="8" Margin="0,3,0,0">
-                             <Border Background="{StaticResource BarTrack}"/>
-                             <Rectangle x:Name="TempFill" HorizontalAlignment="Left" Width="0"
-                                        Fill="{StaticResource RedBar}"/>
-                             <UniformGrid Rows="1" IsHitTestVisible="False">
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border/>
-                             </UniformGrid>
-                         </Grid>
-                     </Grid>
+                     -->
 
                      <!-- PROC -->
                      <Grid x:Name="ProcSection">
