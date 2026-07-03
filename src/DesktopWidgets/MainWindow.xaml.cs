@@ -41,6 +41,7 @@ public partial class MainWindow : Window
     private static readonly SolidColorBrush PurpleText = new(System.Windows.Media.Color.FromRgb(0xBD, 0x93, 0xF9));
     private static readonly SolidColorBrush RedText = new(System.Windows.Media.Color.FromRgb(0xFF, 0x55, 0x55));
     private static readonly SolidColorBrush TealText = new(System.Windows.Media.Color.FromRgb(0x00, 0xCE, 0xD1));
+    private static readonly SolidColorBrush DimText = new(System.Windows.Media.Color.FromRgb(0x60, 0x60, 0x60));  // N/A / hardware-limited
 
     // LibreHardwareMonitor for CPU/GPU temperature
     private readonly Computer _computer;
@@ -431,78 +432,82 @@ public partial class MainWindow : Window
         // catch { }
 
         // TEMP (CPU / GPU dual temperature via LibreHardwareMonitor)
-        // CPU priority: Package → any core → Storage composite (SSD as proxy) → any temp
-        // GPU priority: GpuCore → any GPU temp → none (integrated GPUs often lack sensors)
-        double cpuTemp = 0; bool cpuTempAvailable = false; string cpuTempSource = "";
-        double gpuTemp = 0; bool gpuTempAvailable = false; string gpuTempSource = "";
+        // Strategy: read from actual hardware sensors only. If sensors don't exist or
+        // return no value (e.g. HP BIOS blocks CPU temp, iGPU has no temp sensor),
+        // show "N/A" with a dimmed color and a tooltip explaining the hardware limitation.
+        double cpuTemp = 0; bool cpuTempAvailable = false;
+        bool cpuHasSensors = false;   // true if CPU temp sensors exist (even if values are null)
+        double gpuTemp = 0; bool gpuTempAvailable = false;
+        bool gpuHasSensors = false;   // true if GPU temp sensors exist
+        bool gpuHardwareFound = false; // true if any GPU hardware is detected at all
+
         try
         {
             foreach (var hardware in _computer.Hardware)
             {
                 hardware.Update();
-                foreach (var sensor in hardware.Sensors)
+
+                // CPU temperature: Package → any core (skip "Distance to TjMax")
+                if (hardware.HardwareType == HardwareType.Cpu && !cpuTempAvailable)
                 {
-                    if (sensor.SensorType != SensorType.Temperature || !sensor.Value.HasValue)
-                        continue;
-
-                    // CPU temperature: Package → any core
-                    if (hardware.HardwareType == HardwareType.Cpu && !cpuTempAvailable)
+                    foreach (var sensor in hardware.Sensors)
                     {
-                        if (sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase))
-                        {
-                            cpuTemp = Math.Round(sensor.Value.Value, 0);
-                            cpuTempAvailable = true;
-                            cpuTempSource = "CPU";
-                        }
-                        else if (!sensor.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase)
-                                 && string.IsNullOrEmpty(cpuTempSource))
-                        {
-                            cpuTemp = Math.Round(sensor.Value.Value, 0);
-                            cpuTempAvailable = true;
-                            cpuTempSource = "CPU";
-                        }
-                    }
+                        if (sensor.SensorType != SensorType.Temperature) continue;
+                        if (sensor.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase)) continue;
 
-                    // GPU temperature: Core → any GPU temp
-                    if (!gpuTempAvailable &&
-                        (hardware.HardwareType == HardwareType.GpuNvidia ||
-                         hardware.HardwareType == HardwareType.GpuAmd ||
-                         hardware.HardwareType == HardwareType.GpuIntel))
-                    {
-                        if (sensor.Name.Contains("Core", StringComparison.OrdinalIgnoreCase))
-                        {
-                            gpuTemp = Math.Round(sensor.Value.Value, 0);
-                            gpuTempAvailable = true;
-                            gpuTempSource = "GPU";
-                        }
-                        else if (!sensor.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase)
-                                 && string.IsNullOrEmpty(gpuTempSource))
-                        {
-                            gpuTemp = Math.Round(sensor.Value.Value, 0);
-                            gpuTempAvailable = true;
-                            gpuTempSource = "GPU";
-                        }
-                    }
+                        cpuHasSensors = true;  // there IS a CPU temp sensor, value may or may not be null
 
-                    // Storage composite as CPU fallback (SSD temp ≈ system temp proxy)
-                    if (hardware.HardwareType == HardwareType.Storage &&
-                        sensor.Name.Contains("Composite", StringComparison.OrdinalIgnoreCase) &&
-                        !cpuTempAvailable)
-                    {
-                        cpuTemp = Math.Round(sensor.Value.Value, 0);
-                        cpuTempAvailable = true;
-                        cpuTempSource = "SSD";
-                    }
-
-                    // Any temperature as last-resort CPU fallback
-                    if (!cpuTempAvailable)
-                    {
-                        cpuTemp = Math.Round(sensor.Value.Value, 0);
-                        cpuTempAvailable = true;
-                        cpuTempSource = "SYS";
+                        if (sensor.Value.HasValue)
+                        {
+                            // Prefer "Package" sensor, otherwise take first available
+                            if (sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase))
+                            {
+                                cpuTemp = Math.Round(sensor.Value.Value, 0);
+                                cpuTempAvailable = true;
+                                break;
+                            }
+                            if (!cpuTempAvailable)
+                            {
+                                cpuTemp = Math.Round(sensor.Value.Value, 0);
+                                cpuTempAvailable = true;
+                                // don't break — keep looking for Package sensor
+                            }
+                        }
                     }
                 }
-                if (cpuTempAvailable && cpuTempSource == "CPU" && gpuTempAvailable) break;
+
+                // GPU temperature: Core → any GPU temp
+                if (hardware.HardwareType == HardwareType.GpuNvidia ||
+                    hardware.HardwareType == HardwareType.GpuAmd ||
+                    hardware.HardwareType == HardwareType.GpuIntel)
+                {
+                    gpuHardwareFound = true;
+                    if (!gpuTempAvailable)
+                    {
+                        foreach (var sensor in hardware.Sensors)
+                        {
+                            if (sensor.SensorType != SensorType.Temperature) continue;
+                            if (sensor.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase)) continue;
+
+                            gpuHasSensors = true;
+
+                            if (sensor.Value.HasValue)
+                            {
+                                if (sensor.Name.Contains("Core", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    gpuTemp = Math.Round(sensor.Value.Value, 0);
+                                    gpuTempAvailable = true;
+                                    break;
+                                }
+                                if (!gpuTempAvailable)
+                                {
+                                    gpuTemp = Math.Round(sensor.Value.Value, 0);
+                                    gpuTempAvailable = true;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         catch { }
@@ -512,41 +517,53 @@ public partial class MainWindow : Window
         string gpuTempStr = gpuTempAvailable ? $"{gpuTemp:F0}°" : "N/A";
         TempValue.Text = $"{cpuTempStr} / {gpuTempStr}";
 
-        // Update tag labels to show source when it's not the expected sensor
-        TempCpuTag.Text = cpuTempSource == "SSD" ? "SSD" : cpuTempSource == "SYS" ? "SYS" : "CPU";
-        TempGpuTag.Text = gpuTempAvailable ? "GPU" : "GPU";
-
-        // CPU temp bar
-        if (cpuTempAvailable && TempCpuBarContainer.ActualWidth > 0)
+        // CPU tag & color
+        TempCpuTag.Text = "CPU";
+        if (cpuTempAvailable)
         {
-            TempCpuFill.Width = (cpuTemp / 100.0) * TempCpuBarContainer.ActualWidth;
-            if (cpuTemp > 80)
-                TempCpuFill.Fill = FindResource("RedBar") as System.Windows.Media.Brush;
-            else if (cpuTemp > 60)
-                TempCpuFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
-            else
-                TempCpuFill.Fill = FindResource("CyanBar") as System.Windows.Media.Brush;
+            TempCpuTag.ToolTip = null;
+            if (TempCpuBarContainer.ActualWidth > 0)
+            {
+                TempCpuFill.Width = (cpuTemp / 100.0) * TempCpuBarContainer.ActualWidth;
+                TempCpuFill.Fill = cpuTemp > 80 ? FindResource("RedBar") as System.Windows.Media.Brush
+                                 : cpuTemp > 60 ? FindResource("YellowBar") as System.Windows.Media.Brush
+                                 : FindResource("CyanBar") as System.Windows.Media.Brush;
+            }
         }
         else
         {
             TempCpuFill.Width = 0;
+            TempCpuTag.Foreground = DimText;
+            TempCpuTag.ToolTip = cpuHasSensors
+                ? "CPU 温度传感器存在但 BIOS 未暴露数据（部分笔记本限制）"
+                : "未检测到 CPU 温度传感器";
         }
+        if (cpuTempAvailable) TempCpuTag.Foreground = FindResource("CyanBar") as System.Windows.Media.Brush;
 
-        // GPU temp bar
-        if (gpuTempAvailable && TempGpuBarContainer.ActualWidth > 0)
+        // GPU tag & color
+        TempGpuTag.Text = "GPU";
+        if (gpuTempAvailable)
         {
-            TempGpuFill.Width = (gpuTemp / 100.0) * TempGpuBarContainer.ActualWidth;
-            if (gpuTemp > 80)
-                TempGpuFill.Fill = FindResource("RedBar") as System.Windows.Media.Brush;
-            else if (gpuTemp > 60)
-                TempGpuFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
-            else
-                TempGpuFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
+            TempGpuTag.ToolTip = null;
+            if (TempGpuBarContainer.ActualWidth > 0)
+            {
+                TempGpuFill.Width = (gpuTemp / 100.0) * TempGpuBarContainer.ActualWidth;
+                TempGpuFill.Fill = gpuTemp > 80 ? FindResource("RedBar") as System.Windows.Media.Brush
+                                 : gpuTemp > 60 ? FindResource("YellowBar") as System.Windows.Media.Brush
+                                 : FindResource("YellowBar") as System.Windows.Media.Brush;
+            }
         }
         else
         {
             TempGpuFill.Width = 0;
+            TempGpuTag.Foreground = DimText;
+            TempGpuTag.ToolTip = gpuHardwareFound
+                ? (gpuHasSensors
+                    ? "GPU 温度传感器存在但未返回数据"
+                    : "当前 GPU 为集成显卡，无温度传感器")
+                : "未检测到独立 GPU";
         }
+        if (gpuTempAvailable) TempGpuTag.Foreground = FindResource("YellowBar") as System.Windows.Media.Brush;
 
         // PROC (process count)
         int procCount = 0;
