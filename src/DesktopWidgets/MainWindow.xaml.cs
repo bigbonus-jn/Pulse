@@ -431,8 +431,10 @@ public partial class MainWindow : Window
         // catch { }
 
         // TEMP (CPU / GPU dual temperature via LibreHardwareMonitor)
-        double cpuTemp = 0; bool cpuTempAvailable = false;
-        double gpuTemp = 0; bool gpuTempAvailable = false;
+        // CPU priority: Package → any core → Storage composite (SSD as proxy) → any temp
+        // GPU priority: GpuCore → any GPU temp → none (integrated GPUs often lack sensors)
+        double cpuTemp = 0; bool cpuTempAvailable = false; string cpuTempSource = "";
+        double gpuTemp = 0; bool gpuTempAvailable = false; string gpuTempSource = "";
         try
         {
             foreach (var hardware in _computer.Hardware)
@@ -443,59 +445,64 @@ public partial class MainWindow : Window
                     if (sensor.SensorType != SensorType.Temperature || !sensor.Value.HasValue)
                         continue;
 
-                    // CPU temperature: Package → any core → any CPU temp
+                    // CPU temperature: Package → any core
                     if (hardware.HardwareType == HardwareType.Cpu && !cpuTempAvailable)
                     {
                         if (sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase))
                         {
                             cpuTemp = Math.Round(sensor.Value.Value, 0);
                             cpuTempAvailable = true;
+                            cpuTempSource = "CPU";
                         }
-                        else if (!sensor.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase))
+                        else if (!sensor.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase)
+                                 && string.IsNullOrEmpty(cpuTempSource))
                         {
                             cpuTemp = Math.Round(sensor.Value.Value, 0);
                             cpuTempAvailable = true;
+                            cpuTempSource = "CPU";
                         }
                     }
 
-                    // GPU temperature: GpuCore → any GPU temp
-                    if (hardware.HardwareType == HardwareType.GpuNvidia ||
-                        hardware.HardwareType == HardwareType.GpuAmd ||
-                        hardware.HardwareType == HardwareType.GpuIntel)
+                    // GPU temperature: Core → any GPU temp
+                    if (!gpuTempAvailable &&
+                        (hardware.HardwareType == HardwareType.GpuNvidia ||
+                         hardware.HardwareType == HardwareType.GpuAmd ||
+                         hardware.HardwareType == HardwareType.GpuIntel))
                     {
-                        if (!gpuTempAvailable)
+                        if (sensor.Name.Contains("Core", StringComparison.OrdinalIgnoreCase))
                         {
-                            if (sensor.Name.Contains("Core", StringComparison.OrdinalIgnoreCase))
-                            {
-                                gpuTemp = Math.Round(sensor.Value.Value, 0);
-                                gpuTempAvailable = true;
-                            }
-                            else if (!sensor.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase))
-                            {
-                                gpuTemp = Math.Round(sensor.Value.Value, 0);
-                                gpuTempAvailable = true;
-                            }
+                            gpuTemp = Math.Round(sensor.Value.Value, 0);
+                            gpuTempAvailable = true;
+                            gpuTempSource = "GPU";
+                        }
+                        else if (!sensor.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase)
+                                 && string.IsNullOrEmpty(gpuTempSource))
+                        {
+                            gpuTemp = Math.Round(sensor.Value.Value, 0);
+                            gpuTempAvailable = true;
+                            gpuTempSource = "GPU";
                         }
                     }
-                }
-            }
 
-            // CPU temp fallback: Storage composite → any Temperature
-            if (!cpuTempAvailable)
-            {
-                foreach (var hardware in _computer.Hardware)
-                {
-                    foreach (var sensor in hardware.Sensors)
+                    // Storage composite as CPU fallback (SSD temp ≈ system temp proxy)
+                    if (hardware.HardwareType == HardwareType.Storage &&
+                        sensor.Name.Contains("Composite", StringComparison.OrdinalIgnoreCase) &&
+                        !cpuTempAvailable)
                     {
-                        if (sensor.SensorType == SensorType.Temperature && sensor.Value.HasValue && !cpuTempAvailable)
-                        {
-                            cpuTemp = Math.Round(sensor.Value.Value, 0);
-                            cpuTempAvailable = true;
-                            break;
-                        }
+                        cpuTemp = Math.Round(sensor.Value.Value, 0);
+                        cpuTempAvailable = true;
+                        cpuTempSource = "SSD";
                     }
-                    if (cpuTempAvailable) break;
+
+                    // Any temperature as last-resort CPU fallback
+                    if (!cpuTempAvailable)
+                    {
+                        cpuTemp = Math.Round(sensor.Value.Value, 0);
+                        cpuTempAvailable = true;
+                        cpuTempSource = "SYS";
+                    }
                 }
+                if (cpuTempAvailable && cpuTempSource == "CPU" && gpuTempAvailable) break;
             }
         }
         catch { }
@@ -504,6 +511,10 @@ public partial class MainWindow : Window
         string cpuTempStr = cpuTempAvailable ? $"{cpuTemp:F0}°" : "N/A";
         string gpuTempStr = gpuTempAvailable ? $"{gpuTemp:F0}°" : "N/A";
         TempValue.Text = $"{cpuTempStr} / {gpuTempStr}";
+
+        // Update tag labels to show source when it's not the expected sensor
+        TempCpuTag.Text = cpuTempSource == "SSD" ? "SSD" : cpuTempSource == "SYS" ? "SYS" : "CPU";
+        TempGpuTag.Text = gpuTempAvailable ? "GPU" : "GPU";
 
         // CPU temp bar
         if (cpuTempAvailable && TempCpuBarContainer.ActualWidth > 0)
