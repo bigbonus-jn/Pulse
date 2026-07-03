@@ -44,15 +44,27 @@
             <GradientStop Color="#E03030" Offset="1"/>
         </LinearGradientBrush>
 
+        <!-- Bar track (visible background) -->
+        <SolidColorBrush x:Key="BarTrack" Color="#15FFFFFF"/>
+
         <!-- Tick mark style -->
         <Style x:Key="BarTick" TargetType="Border">
             <Setter Property="BorderThickness" Value="0,0,1,0"/>
             <Setter Property="BorderBrush">
                 <Setter.Value>
-                    <SolidColorBrush Color="#00FFF9" Opacity="0.06"/>
+                    <SolidColorBrush Color="#00FFF9" Opacity="0.08"/>
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Neon glow effect for metric values -->
+        <DropShadowEffect x:Key="CyanGlow" ShadowDepth="0" BlurRadius="6" Color="#00FFF9" Opacity="0.6"/>
+        <DropShadowEffect x:Key="MagentaGlow" ShadowDepth="0" BlurRadius="6" Color="#FF2A6D" Opacity="0.6"/>
+        <DropShadowEffect x:Key="YellowGlow" ShadowDepth="0" BlurRadius="6" Color="#FFD700" Opacity="0.6"/>
+        <DropShadowEffect x:Key="WhiteGlow" ShadowDepth="0" BlurRadius="5" Color="#FFFFFF" Opacity="0.4"/>
+        <DropShadowEffect x:Key="PurpleGlow" ShadowDepth="0" BlurRadius="6" Color="#BD93F9" Opacity="0.6"/>
+        <DropShadowEffect x:Key="RedGlow" ShadowDepth="0" BlurRadius="6" Color="#FF5555" Opacity="0.6"/>
+        <DropShadowEffect x:Key="TealGlow" ShadowDepth="0" BlurRadius="6" Color="#00CED1" Opacity="0.6"/>
     </Window.Resources>
 
     <Border Background="#0A0A14"
@@ -71,7 +83,7 @@
 
             <!-- Scanline -->
             <Rectangle x:Name="ScanlineRect" Height="4" VerticalAlignment="Top"
-                       IsHitTestVisible="False" Opacity="0.04">
+                       IsHitTestVisible="False">
                 <Rectangle.Fill>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                         <GradientStop Color="Transparent" Offset="0"/>
@@ -82,6 +94,21 @@
                 <Rectangle.RenderTransform>
                     <TranslateTransform x:Name="ScanlineTransform" Y="-4"/>
                 </Rectangle.RenderTransform>
+                <Rectangle.Style>
+                    <Style TargetType="Rectangle">
+                        <Style.Triggers>
+                            <EventTrigger RoutedEvent="Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                         From="0.03" To="0.10" Duration="0:0:2"
+                                                         AutoReverse="True" RepeatBehavior="Forever"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Rectangle.Style>
             </Rectangle>
 
             <!-- Main content -->
@@ -93,9 +120,12 @@
                     <Border DockPanel.Dock="Bottom" Height="1" Background="#1A00FFF9"/>
 
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
-                        <Ellipse Width="5" Height="5" Fill="#00FFF9" Margin="0,0,6,0"/>
-                        <Ellipse Width="5" Height="5" Fill="#FF2A6D" Margin="0,0,6,0"/>
-                        <Ellipse Width="5" Height="5" Fill="#FFD700" Margin="0,0,6,0"/>
+                        <Ellipse Width="5" Height="5" Fill="#00FFF9" Margin="0,0,6,0"
+                                 Effect="{StaticResource CyanGlow}"/>
+                        <Ellipse Width="5" Height="5" Fill="#FF2A6D" Margin="0,0,6,0"
+                                 Effect="{StaticResource MagentaGlow}"/>
+                        <Ellipse Width="5" Height="5" Fill="#FFD700" Margin="0,0,6,0"
+                                 Effect="{StaticResource YellowGlow}"/>
                         <TextBlock Text="SYSMON" FontFamily="Consolas" FontSize="10"
                                    Foreground="#7F00FFF9" FontWeight="Bold"
                                    VerticalAlignment="Center"/>
@@ -122,14 +152,15 @@
                 <!-- Bottom bar -->
                 <DockPanel DockPanel.Dock="Bottom" Height="22">
                     <Border DockPanel.Dock="Top" Height="1" Background="#1400FFF9"/>
-                    <TextBlock Text="v0.4" FontFamily="Consolas" FontSize="9"
+                    <TextBlock Text="v0.5" FontFamily="Consolas" FontSize="9"
                                Foreground="#26FFFFFF"
                                VerticalAlignment="Center" Margin="10,0,0,0"/>
-                    <TextBlock x:Name="ClockLabel" Text="--:--:--"
-                               FontFamily="Consolas" FontSize="11"
-                               Foreground="#BF00FFF9"
-                               VerticalAlignment="Center"
-                               HorizontalAlignment="Right" Margin="0,0,10,0"/>
+                     <TextBlock x:Name="ClockLabel" Text="--:--:--"
+                                FontFamily="Consolas" FontSize="11"
+                                Foreground="#BF00FFF9"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Right" Margin="0,0,10,0"
+                                Effect="{StaticResource CyanGlow}"/>
                 </DockPanel>
 
                 <!-- Metrics content -->
@@ -141,14 +172,16 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <DockPanel x:Name="CpuHeaderRow" Grid.Row="0">
-                            <TextBlock x:Name="CpuLabel" Text="CPU" FontFamily="Consolas"
-                                       FontSize="11" FontWeight="Bold" Foreground="#00FFF9"/>
-                            <TextBlock x:Name="CpuValue" Text="--%" FontFamily="Consolas"
-                                       FontSize="13" Foreground="#00FFF9"
-                                       HorizontalAlignment="Right"/>
+                             <TextBlock x:Name="CpuLabel" Text="CPU" FontFamily="Consolas"
+                                        FontSize="11" FontWeight="Bold" Foreground="#00FFF9"
+                                        Effect="{StaticResource CyanGlow}"/>
+                             <TextBlock x:Name="CpuValue" Text="--%" FontFamily="Consolas"
+                                        FontSize="13" Foreground="#00FFF9"
+                                        HorizontalAlignment="Right"
+                                        Effect="{StaticResource CyanGlow}"/>
                         </DockPanel>
                         <Grid x:Name="CpuBarContainer" Grid.Row="1" Height="8" Margin="0,3,0,0">
-                            <Border Background="#0AFFFFFF"/>
+                            <Border Background="{StaticResource BarTrack}"/>
                             <Rectangle x:Name="CpuFill" HorizontalAlignment="Left" Width="0"
                                        Fill="{StaticResource CyanBar}"/>
                             <UniformGrid Rows="1" IsHitTestVisible="False">
@@ -173,14 +206,16 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <DockPanel x:Name="RamHeaderRow" Grid.Row="0">
-                            <TextBlock x:Name="RamLabel" Text="RAM" FontFamily="Consolas"
-                                       FontSize="11" FontWeight="Bold" Foreground="#FF2A6D"/>
-                            <TextBlock x:Name="RamValue" Text="--" FontFamily="Consolas"
-                                       FontSize="13" Foreground="#FF2A6D"
-                                       HorizontalAlignment="Right"/>
+                             <TextBlock x:Name="RamLabel" Text="RAM" FontFamily="Consolas"
+                                        FontSize="11" FontWeight="Bold" Foreground="#FF2A6D"
+                                        Effect="{StaticResource MagentaGlow}"/>
+                             <TextBlock x:Name="RamValue" Text="--" FontFamily="Consolas"
+                                        FontSize="13" Foreground="#FF2A6D"
+                                        HorizontalAlignment="Right"
+                                        Effect="{StaticResource MagentaGlow}"/>
                         </DockPanel>
                         <Grid x:Name="RamBarContainer" Grid.Row="1" Height="8" Margin="0,3,0,0">
-                            <Border Background="#0AFFFFFF"/>
+                            <Border Background="{StaticResource BarTrack}"/>
                             <Rectangle x:Name="RamFill" HorizontalAlignment="Left" Width="0"
                                        Fill="{StaticResource MagentaBar}"/>
                             <UniformGrid Rows="1" IsHitTestVisible="False">
@@ -205,14 +240,16 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <DockPanel x:Name="GpuHeaderRow" Grid.Row="0">
-                            <TextBlock x:Name="GpuLabel" Text="GPU" FontFamily="Consolas"
-                                       FontSize="11" FontWeight="Bold" Foreground="#FFD700"/>
-                            <TextBlock x:Name="GpuValue" Text="N/A" FontFamily="Consolas"
-                                       FontSize="13" Foreground="#FFD700"
-                                       HorizontalAlignment="Right"/>
+                             <TextBlock x:Name="GpuLabel" Text="GPU" FontFamily="Consolas"
+                                        FontSize="11" FontWeight="Bold" Foreground="#FFD700"
+                                        Effect="{StaticResource YellowGlow}"/>
+                             <TextBlock x:Name="GpuValue" Text="N/A" FontFamily="Consolas"
+                                        FontSize="13" Foreground="#FFD700"
+                                        HorizontalAlignment="Right"
+                                        Effect="{StaticResource YellowGlow}"/>
                         </DockPanel>
                         <Grid x:Name="GpuBarContainer" Grid.Row="1" Height="8" Margin="0,3,0,0">
-                            <Border Background="#0AFFFFFF"/>
+                            <Border Background="{StaticResource BarTrack}"/>
                             <Rectangle x:Name="GpuFill" HorizontalAlignment="Left" Width="0"
                                        Fill="{StaticResource YellowBar}"/>
                             <UniformGrid Rows="1" IsHitTestVisible="False">
@@ -237,11 +274,13 @@
                              <RowDefinition Height="Auto"/>
                          </Grid.RowDefinitions>
                          <DockPanel x:Name="NetHeaderRow" Grid.Row="0">
-                             <TextBlock x:Name="NetLabel" Text="NET" FontFamily="Consolas"
-                                        FontSize="11" FontWeight="Bold" Foreground="#D9FFFFFF"/>
-                             <TextBlock x:Name="NetValue" Text="0 / 0" FontFamily="Consolas"
-                                        FontSize="13" Foreground="#E6FFFFFF"
-                                        HorizontalAlignment="Right"/>
+                              <TextBlock x:Name="NetLabel" Text="NET" FontFamily="Consolas"
+                                         FontSize="11" FontWeight="Bold" Foreground="#D9FFFFFF"
+                                         Effect="{StaticResource WhiteGlow}"/>
+                              <TextBlock x:Name="NetValue" Text="0 / 0" FontFamily="Consolas"
+                                         FontSize="13" Foreground="#E6FFFFFF"
+                                         HorizontalAlignment="Right"
+                                         Effect="{StaticResource WhiteGlow}"/>
                          </DockPanel>
                          <Grid Grid.Row="1" Margin="0,3,0,0" x:Name="NetBarsGrid">
                              <Grid.ColumnDefinitions>
@@ -253,7 +292,7 @@
                                  <TextBlock x:Name="NetUpTag" Text="UP" FontFamily="Consolas"
                                             FontSize="9" Foreground="#B339FF14" Margin="0,0,0,2"/>
                                  <Grid x:Name="NetUpBarContainer" Height="6">
-                                     <Border Background="#0AFFFFFF"/>
+                                     <Border Background="{StaticResource BarTrack}"/>
                                      <Rectangle x:Name="NetUpFill" HorizontalAlignment="Left" Width="0"
                                                 Fill="{StaticResource GreenBar}" Opacity="0.8"/>
                                  </Grid>
@@ -262,7 +301,7 @@
                                  <TextBlock x:Name="NetDnTag" Text="DN" FontFamily="Consolas"
                                             FontSize="9" Foreground="#B3FF8C00" Margin="0,0,0,2"/>
                                  <Grid x:Name="NetDnBarContainer" Height="6">
-                                     <Border Background="#0AFFFFFF"/>
+                                     <Border Background="{StaticResource BarTrack}"/>
                                      <Rectangle x:Name="NetDnFill" HorizontalAlignment="Left" Width="0"
                                                 Fill="{StaticResource OrangeBar}" Opacity="0.8"/>
                                  </Grid>
@@ -277,14 +316,16 @@
                              <RowDefinition Height="Auto"/>
                          </Grid.RowDefinitions>
                          <DockPanel x:Name="DiskHeaderRow" Grid.Row="0">
-                             <TextBlock x:Name="DiskLabel" Text="DISK" FontFamily="Consolas"
-                                        FontSize="11" FontWeight="Bold" Foreground="#BD93F9"/>
-                             <TextBlock x:Name="DiskValue" Text="--" FontFamily="Consolas"
-                                        FontSize="13" Foreground="#BD93F9"
-                                        HorizontalAlignment="Right"/>
+                              <TextBlock x:Name="DiskLabel" Text="DISK" FontFamily="Consolas"
+                                         FontSize="11" FontWeight="Bold" Foreground="#BD93F9"
+                                         Effect="{StaticResource PurpleGlow}"/>
+                              <TextBlock x:Name="DiskValue" Text="--" FontFamily="Consolas"
+                                         FontSize="13" Foreground="#BD93F9"
+                                         HorizontalAlignment="Right"
+                                         Effect="{StaticResource PurpleGlow}"/>
                          </DockPanel>
                          <Grid x:Name="DiskBarContainer" Grid.Row="1" Height="8" Margin="0,3,0,0">
-                             <Border Background="#0AFFFFFF"/>
+                             <Border Background="{StaticResource BarTrack}"/>
                              <Rectangle x:Name="DiskFill" HorizontalAlignment="Left" Width="0"
                                         Fill="{StaticResource PurpleBar}"/>
                              <UniformGrid Rows="1" IsHitTestVisible="False">
@@ -309,14 +350,16 @@
                              <RowDefinition Height="Auto"/>
                          </Grid.RowDefinitions>
                          <DockPanel x:Name="TempHeaderRow" Grid.Row="0">
-                             <TextBlock x:Name="TempLabel" Text="TEMP" FontFamily="Consolas"
-                                        FontSize="11" FontWeight="Bold" Foreground="#FF5555"/>
-                             <TextBlock x:Name="TempValue" Text="N/A" FontFamily="Consolas"
-                                        FontSize="13" Foreground="#FF5555"
-                                        HorizontalAlignment="Right"/>
+                              <TextBlock x:Name="TempLabel" Text="TEMP" FontFamily="Consolas"
+                                         FontSize="11" FontWeight="Bold" Foreground="#FF5555"
+                                         Effect="{StaticResource RedGlow}"/>
+                              <TextBlock x:Name="TempValue" Text="N/A" FontFamily="Consolas"
+                                         FontSize="13" Foreground="#FF5555"
+                                         HorizontalAlignment="Right"
+                                         Effect="{StaticResource RedGlow}"/>
                          </DockPanel>
                          <Grid x:Name="TempBarContainer" Grid.Row="1" Height="8" Margin="0,3,0,0">
-                             <Border Background="#0AFFFFFF"/>
+                             <Border Background="{StaticResource BarTrack}"/>
                              <Rectangle x:Name="TempFill" HorizontalAlignment="Left" Width="0"
                                         Fill="{StaticResource RedBar}"/>
                              <UniformGrid Rows="1" IsHitTestVisible="False">
@@ -341,14 +384,16 @@
                              <RowDefinition Height="Auto"/>
                          </Grid.RowDefinitions>
                          <DockPanel x:Name="ProcHeaderRow" Grid.Row="0">
-                             <TextBlock x:Name="ProcLabel" Text="PROC" FontFamily="Consolas"
-                                        FontSize="11" FontWeight="Bold" Foreground="#00CED1"/>
-                             <TextBlock x:Name="ProcValue" Text="--" FontFamily="Consolas"
-                                        FontSize="13" Foreground="#00CED1"
-                                        HorizontalAlignment="Right"/>
+                              <TextBlock x:Name="ProcLabel" Text="PROC" FontFamily="Consolas"
+                                         FontSize="11" FontWeight="Bold" Foreground="#00CED1"
+                                         Effect="{StaticResource TealGlow}"/>
+                              <TextBlock x:Name="ProcValue" Text="--" FontFamily="Consolas"
+                                         FontSize="13" Foreground="#00CED1"
+                                         HorizontalAlignment="Right"
+                                         Effect="{StaticResource TealGlow}"/>
                          </DockPanel>
                          <Grid x:Name="ProcBarContainer" Grid.Row="1" Height="8" Margin="0,3,0,0">
-                             <Border Background="#0AFFFFFF"/>
+                             <Border Background="{StaticResource BarTrack}"/>
                              <Rectangle x:Name="ProcFill" HorizontalAlignment="Left" Width="0"
                                         Fill="{StaticResource CyanBar}" Opacity="0.5"/>
                              <UniformGrid Rows="1" IsHitTestVisible="False">
