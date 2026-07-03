@@ -68,7 +68,7 @@ public partial class MainWindow : Window
         Height = _config.Data.Height;
 
         // Initialize LibreHardwareMonitor for CPU temperature
-        _computer = new Computer { IsCpuEnabled = true };
+        _computer = new Computer { IsCpuEnabled = true, IsStorageEnabled = true };
         try { _computer.Open(); } catch { }
     }
 
@@ -418,9 +418,11 @@ public partial class MainWindow : Window
         else
             DiskFill.Fill = FindResource("PurpleBar") as System.Windows.Media.Brush;
 
-        // TEMP (CPU temperature via LibreHardwareMonitor)
-        double cpuTemp = 0;
+        // TEMP (temperature via LibreHardwareMonitor)
+        // Priority: CPU Package → CPU any core → Storage composite → any Temperature
+        double tempValue = 0;
         bool tempAvailable = false;
+        string tempSource = "";
         try
         {
             foreach (var hardware in _computer.Hardware)
@@ -428,25 +430,75 @@ public partial class MainWindow : Window
                 hardware.Update();
                 foreach (var sensor in hardware.Sensors)
                 {
-                    if (sensor.SensorType == SensorType.Temperature && sensor.Value.HasValue)
+                    if (sensor.SensorType != SensorType.Temperature || !sensor.Value.HasValue)
+                        continue;
+
+                    // Priority 1: CPU Package
+                    if (hardware.HardwareType == HardwareType.Cpu &&
+                        sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase))
                     {
-                        cpuTemp = Math.Round(sensor.Value.Value, 0);
+                        tempValue = Math.Round(sensor.Value.Value, 0);
                         tempAvailable = true;
+                        tempSource = "CPU";
                         break;
                     }
+
+                    // Priority 2: CPU any core (first one with value)
+                    if (hardware.HardwareType == HardwareType.Cpu && !tempAvailable)
+                    {
+                        // Skip "Distance to TjMax" sensors
+                        if (sensor.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase))
+                            continue;
+                        if (string.IsNullOrEmpty(tempSource))
+                        {
+                            tempValue = Math.Round(sensor.Value.Value, 0);
+                            tempAvailable = true;
+                            tempSource = "CPU";
+                        }
+                    }
+
+                    // Priority 3: Storage composite temperature
+                    if (hardware.HardwareType == HardwareType.Storage &&
+                        sensor.Name.Contains("Composite", StringComparison.OrdinalIgnoreCase) &&
+                        !tempAvailable)
+                    {
+                        tempValue = Math.Round(sensor.Value.Value, 0);
+                        tempAvailable = true;
+                        tempSource = "SSD";
+                    }
                 }
-                if (tempAvailable) break;
+                if (tempAvailable && tempSource == "CPU") break;
+            }
+
+            // Priority 4: any temperature at all
+            if (!tempAvailable)
+            {
+                foreach (var hardware in _computer.Hardware)
+                {
+                    foreach (var sensor in hardware.Sensors)
+                    {
+                        if (sensor.SensorType == SensorType.Temperature && sensor.Value.HasValue)
+                        {
+                            tempValue = Math.Round(sensor.Value.Value, 0);
+                            tempAvailable = true;
+                            tempSource = hardware.HardwareType == HardwareType.Storage ? "SSD" : "SYS";
+                            break;
+                        }
+                    }
+                    if (tempAvailable) break;
+                }
             }
         }
         catch { }
-        TempValue.Text = tempAvailable ? $"{cpuTemp:F0}°C" : "N/A";
+        TempLabel.Text = tempAvailable ? $"TEMP" : "TEMP";
+        TempValue.Text = tempAvailable ? $"{tempValue:F0}°C" : "N/A";
         if (tempAvailable)
         {
-            TempValue.Foreground = cpuTemp > 80 ? RedText : cpuTemp > 60 ? YellowText : CyanText;
-            TempFill.Width = (cpuTemp / 100.0) * TempBarContainer.ActualWidth;
-            if (cpuTemp > 80)
+            TempValue.Foreground = tempValue > 80 ? RedText : tempValue > 60 ? YellowText : CyanText;
+            TempFill.Width = (tempValue / 100.0) * TempBarContainer.ActualWidth;
+            if (tempValue > 80)
                 TempFill.Fill = FindResource("RedBar") as System.Windows.Media.Brush;
-            else if (cpuTemp > 60)
+            else if (tempValue > 60)
                 TempFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
             else
                 TempFill.Fill = FindResource("CyanBar") as System.Windows.Media.Brush;
