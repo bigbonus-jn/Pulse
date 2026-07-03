@@ -11,6 +11,7 @@ public class NotifyIconWrapper : IDisposable
 {
     private readonly System.Windows.Forms.NotifyIcon _notifyIcon;
     private readonly MainWindow _mainWindow;
+    private readonly AutoStartService _autoStart = new();
 
     public NotifyIconWrapper(MainWindow mainWindow)
     {
@@ -27,11 +28,33 @@ public class NotifyIconWrapper : IDisposable
         menu.Items.Add("Show / Hide", null, OnToggleVisibility);
         menu.Items.Add("Toggle Click-Through", null, OnToggleClickThrough);
         menu.Items.Add("Toggle Compact Mode", null, OnToggleCompact);
+        menu.Items.Add(CreateAutoStartMenuItem());
         menu.Items.Add("-");
         menu.Items.Add("Exit", null, OnExit);
 
         _notifyIcon.ContextMenuStrip = menu;
         _notifyIcon.DoubleClick += OnToggleVisibility;
+    }
+
+    private System.Windows.Forms.ToolStripMenuItem CreateAutoStartMenuItem()
+    {
+        var item = new System.Windows.Forms.ToolStripMenuItem("Auto-Start on Boot");
+        item.Checked = _autoStart.IsEnabled;
+        item.Click += OnToggleAutoStart;
+        return item;
+    }
+
+    private void OnToggleAutoStart(object? sender, EventArgs e)
+    {
+        var item = sender as System.Windows.Forms.ToolStripMenuItem;
+        if (item == null) return;
+
+        bool newState = !item.Checked;
+        _autoStart.SetEnabled(newState);
+        item.Checked = _autoStart.IsEnabled;
+
+        // Persist to config
+        _mainWindow.SetAutoStartConfig(_autoStart.IsEnabled);
     }
 
     private static Icon CreateDefaultIcon()

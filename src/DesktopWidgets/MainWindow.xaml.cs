@@ -68,6 +68,11 @@ public partial class MainWindow : Window
         _dataTimer.Start();
         InitializeNetworkCounters();
         InitializeGpuCounters();
+
+        // Sync auto-start state from config to registry
+        var autoStart = new AutoStartService();
+        if (_config.Data.AutoStart && !autoStart.IsEnabled) autoStart.Enable();
+        if (!_config.Data.AutoStart && autoStart.IsEnabled) autoStart.Disable();
     }
 
     private void Window_SourceInitialized(object? sender, EventArgs e)
@@ -235,6 +240,13 @@ public partial class MainWindow : Window
             SetWindowLong(hwnd, GWL_EXSTYLE, style & ~WS_EX_TRANSPARENT);
         else
             SetWindowLong(hwnd, GWL_EXSTYLE, style | WS_EX_TRANSPARENT);
+    }
+
+    // ── Auto-start config bridge ──
+    public void SetAutoStartConfig(bool enabled)
+    {
+        _config.Data.AutoStart = enabled;
+        _config.Save();
     }
 
     public void ShowWindow()

@@ -11,6 +11,7 @@ public class WidgetConfig
     public double Height { get; set; } = 340;
     public bool Topmost { get; set; } = true;
     public bool ClickThrough { get; set; } = false;
+    public bool AutoStart { get; set; } = false;
 }
 
 public class ConfigService
