@@ -12,16 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4022.49" />
     <PackageReference Include="System.Management" Version="9.0.0" />
-  </ItemGroup>
-
-  <!-- Copy widget HTML files to output -->
-  <ItemGroup>
-    <Content Include="..\..\widgets\**\*">
-      <Link>widgets\%(RecursiveDir)%(Filename)%(Extension)</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
 
 </Project>

@@ -1,11 +1,9 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
-using System.Windows.Input;
 using System.Windows.Threading;
 using System.Windows.Media;
-using Microsoft.Web.WebView2.Core;
-using System.Text.Json;
+using System.Windows.Media.Animation;
 using System.Management;
 
 namespace DesktopWidgets;
@@ -17,15 +15,15 @@ public partial class MainWindow : Window
     private readonly PerformanceCounter _cpuCounter = new("Processor", "% Processor Time", "_Total");
     private readonly PerformanceCounter _memCounter = new("Memory", "Available MBytes");
     private readonly ConfigService _config = new();
-    private bool _isWebViewReady;
     private bool _cpuFirstSample = true;
+    private bool _isCompact;
 
-    // Network monitoring - auto-detect active adapter (includes WiFi)
+    // Network monitoring
     private PerformanceCounter? _netSentCounter;
     private PerformanceCounter? _netReceivedCounter;
     private bool _netCountersInitialized;
     private string _netAdapterName = "";
-    private int _netRescanCooldown; // frames to wait before rescanning
+    private int _netRescanCooldown;
 
     // GPU monitoring
     private string _gpuName = "N/A";
@@ -33,11 +31,16 @@ public partial class MainWindow : Window
     private List<PerformanceCounter> _gpuCounters = new();
     private bool _gpuCountersInitialized;
 
-    // Win32 API for click-through and window positioning
+    // Pre-allocated colors & brushes (avoid GC per-tick)
+    private static readonly SolidColorBrush CyanText = new(System.Windows.Media.Color.FromRgb(0x00, 0xFF, 0xF9));
+    private static readonly SolidColorBrush MagentaText = new(System.Windows.Media.Color.FromRgb(0xFF, 0x2A, 0x6D));
+    private static readonly SolidColorBrush YellowText = new(System.Windows.Media.Color.FromRgb(0xFF, 0xD7, 0x00));
+    private static readonly SolidColorBrush WhiteText = new(System.Windows.Media.Color.FromRgb(0xE6, 0xFF, 0xFF));
+
+    // Win32 API
     [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr hwnd, int index, int newStyle);
     [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr hwnd, int index);
     [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
-    [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_TRANSPARENT = 0x00000020;
@@ -46,11 +49,6 @@ public partial class MainWindow : Window
     private const uint SWP_NOMOVE = 0x0002;
     private const uint SWP_NOSIZE = 0x0001;
     private const uint SWP_NOACTIVATE = 0x0010;
-
-    // Win32 constants for drag
-    private const uint WM_NCLBUTTONDOWN = 0x00A1;
-    private const int HTCAPTION = 2;
-    [DllImport("user32.dll")] static extern bool ReleaseCapture();
 
     public MainWindow()
     {
@@ -62,56 +60,21 @@ public partial class MainWindow : Window
         Height = _config.Data.Height;
     }
 
-    private async void Window_Loaded(object sender, RoutedEventArgs e)
+    private void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        // Initialize system tray
         _notifyIcon = new NotifyIconWrapper(this);
-
-        // Ensure topmost and tool window
-        SourceInitialized += (_, _) =>
-        {
-            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            SetWindowLong(hwnd, GWL_EXSTYLE, GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW);
-            SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-        };
-        // Initialize WebView2
-        await WebView.EnsureCoreWebView2Async();
-
-        var htmlPath = System.IO.Path.Combine(
-            AppDomain.CurrentDomain.BaseDirectory, "widgets", "cpu-gauge.html");
-        if (System.IO.File.Exists(htmlPath))
-        {
-            WebView.CoreWebView2.Navigate(new Uri(htmlPath).AbsoluteUri);
-        }
-        else
-        {
-            // Fallback: use embedded html from src/widgets
-            var srcPath = System.IO.Path.Combine(
-                System.IO.Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory)!,
-                "widgets", "cpu-gauge.html");
-            // Try project source path
-            var devPath = System.IO.Path.Combine(
-                AppContext.BaseDirectory, "..", "..", "..", "..", "widgets", "cpu-gauge.html");
-            devPath = System.IO.Path.GetFullPath(devPath);
-            if (System.IO.File.Exists(devPath))
-                WebView.CoreWebView2.Navigate(new Uri(devPath).AbsoluteUri);
-            else
-                WebView.CoreWebView2.NavigateToString("<html><body style='background:#FF00FF;color:white;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:Segoe UI;'><div>Loading...</div></body></html>");
-        }
-
-
-        WebView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
-        _isWebViewReady = true;
-
-        // Start data push timer
+        StartScanlineAnimation();
         _dataTimer.Tick += PushSystemData;
         _dataTimer.Start();
-
-        // Initialize network counters (find active adapter including WiFi)
         InitializeNetworkCounters();
-
-        // Initialize GPU monitoring
         InitializeGpuCounters();
+    }
+
+    private void Window_SourceInitialized(object? sender, EventArgs e)
+    {
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        SetWindowLong(hwnd, GWL_EXSTYLE, GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW);
+        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
 
     protected override void OnLocationChanged(EventArgs e)
@@ -137,229 +100,141 @@ public partial class MainWindow : Window
         _notifyIcon?.Dispose();
     }
 
-    private void InitializeGpuCounters()
+    // ── Drag ──
+    private void TopBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        try
-        {
-            // Get GPU name and VRAM via WMI
-            using var searcher = new ManagementObjectSearcher("SELECT Name, AdapterRAM FROM Win32_VideoController");
-            foreach (ManagementObject obj in searcher.Get())
-            {
-                var name = obj["Name"]?.ToString() ?? "";
-                // Skip virtual/display drivers
-                if (name.Contains("Idd", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("Virtual", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("Mirror", StringComparison.OrdinalIgnoreCase))
-                    continue;
-                _gpuName = name;
-                var vram = obj["AdapterRAM"];
-                if (vram != null) _gpuVramMB = Convert.ToDouble(vram) / (1024.0 * 1024.0);
-                break; // Use first real GPU
-            }
-        }
-        catch { }
-
-        try
-        {
-            // Try GPU Engine performance counter for utilization
-            var cat = new PerformanceCounterCategory("GPU Engine");
-            var instances = cat.GetInstanceNames();
-            foreach (var inst in instances)
-            {
-                // Only count 3D engines for meaningful utilization
-                if (!inst.Contains("engtype_3D")) continue;
-                try
-                {
-                    var counter = new PerformanceCounter("GPU Engine", "Utilization Percentage", inst);
-                    counter.NextValue(); // First sample
-                    _gpuCounters.Add(counter);
-                }
-                catch { }
-            }
-            _gpuCountersInitialized = _gpuCounters.Count > 0;
-        }
-        catch { /* GPU Engine counters not available */ }
+        DragMove();
     }
 
-    private void InitializeNetworkCounters()
+    // ── Compact mode ──
+    private void CompactToggle_Click(object sender, RoutedEventArgs e)
     {
-        // Initial scan - will be refined dynamically in PushSystemData
-        RescanNetworkAdapters();
+        _isCompact = !_isCompact;
+        ApplyCompactMode();
     }
 
-    private void RescanNetworkAdapters()
+    public void ToggleCompactMode()
     {
-        try
-        {
-            var category = new PerformanceCounterCategory("Network Interface");
-            var instances = category.GetInstanceNames();
-
-            // Collect all valid adapters (skip tunnels)
-            var candidates = new List<(string name, PerformanceCounter sent, PerformanceCounter recv, float recvBytes)>();
-
-            foreach (var inst in instances)
-            {
-                if (inst.Contains("isatap", StringComparison.OrdinalIgnoreCase) ||
-                    inst.Contains("Teredo", StringComparison.OrdinalIgnoreCase) ||
-                    inst.Contains("Loopback", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                try
-                {
-                    var sentCounter = new PerformanceCounter("Network Interface", "Bytes Sent/sec", inst);
-                    var recvCounter = new PerformanceCounter("Network Interface", "Bytes Received/sec", inst);
-                    // Prime and read first sample
-                    sentCounter.NextValue();
-                    float recv = recvCounter.NextValue();
-                    candidates.Add((inst, sentCounter, recvCounter, recv));
-                }
-                catch { continue; }
-            }
-
-            if (candidates.Count > 0)
-            {
-                // Pick WiFi first, then the one with most traffic
-                var best = candidates[0];
-                foreach (var c in candidates)
-                {
-                    // Prefer WiFi adapters
-                    if (c.name.Contains("Wi-Fi", StringComparison.OrdinalIgnoreCase) ||
-                        c.name.Contains("Wireless", StringComparison.OrdinalIgnoreCase) ||
-                        c.name.Contains("WLAN", StringComparison.OrdinalIgnoreCase))
-                    {
-                        best = c;
-                        break;
-                    }
-                }
-                _netSentCounter = best.sent;
-                _netReceivedCounter = best.recv;
-                _netAdapterName = best.name;
-                _netCountersInitialized = true;
-            }
-        }
-        catch { /* Network counters not available */ }
+        _isCompact = !_isCompact;
+        ApplyCompactMode();
     }
 
-    private void PushSystemData(object? sender, EventArgs e)
+    private void ApplyCompactMode()
     {
-        if (!_isWebViewReady || WebView.CoreWebView2 == null) return;
+        CompactToggle.Content = _isCompact ? "\u25AB" : "\u25A3";
 
-        float cpuUsage = _cpuCounter.NextValue();
-        // First call to NextValue always returns 0, skip it
-        if (_cpuFirstSample) { _cpuFirstSample = false; return; }
-        float availableMem = _memCounter.NextValue();
-        float totalMem = GetTotalPhysicalMemory();
-        float memUsage = totalMem > 0 ? ((totalMem - availableMem) / totalMem) * 100f : 0f;
+        // Toggle value visibility
+        CpuValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+        RamValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+        GpuValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+        NetValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
 
-        // Network speed - with dynamic adapter re-selection
-        double netSentKbps = 0, netRecvKbps = 0;
-        if (_netCountersInitialized && _netSentCounter != null && _netReceivedCounter != null)
+        // NET tags
+        NetUpTag.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+        NetDnTag.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+
+        if (_isCompact)
         {
-            try
-            {
-                float sentBytes = _netSentCounter.NextValue();
-                float recvBytes = _netReceivedCounter.NextValue();
-                netSentKbps = Math.Round(sentBytes / 1024.0, 1);
-                netRecvKbps = Math.Round(recvBytes / 1024.0, 1);
+            // Compact: switch each Grid to 2-column layout [label | bar]
+            SetMetricGridCompact(CpuSection, CpuHeaderRow, CpuBarContainer, CpuLabel);
+            SetMetricGridCompact(RamSection, RamHeaderRow, RamBarContainer, RamLabel);
+            SetMetricGridCompact(GpuSection, GpuHeaderRow, GpuBarContainer, GpuLabel);
 
-                // If both are zero for a while, rescan (WiFi may have reconnected)
-                if (sentBytes == 0 && recvBytes == 0)
-                {
-                    _netRescanCooldown++;
-                    if (_netRescanCooldown >= 5) // 5 seconds of no traffic → rescan
-                    {
-                        _netRescanCooldown = 0;
-                        RescanNetworkAdapters();
-                    }
-                }
-                else
-                {
-                    _netRescanCooldown = 0;
-                }
-            }
-            catch
-            {
-                // Counter became invalid (adapter disconnected), rescan
-                RescanNetworkAdapters();
-            }
+            // NET: label left, bars right
+            NetSection.ColumnDefinitions.Clear();
+            NetSection.RowDefinitions.Clear();
+            NetSection.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(32) });
+            NetSection.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            System.Windows.Controls.Grid.SetColumn(NetHeaderRow, 0); System.Windows.Controls.Grid.SetRow(NetHeaderRow, 0);
+            System.Windows.Controls.Grid.SetColumn(NetBarsGrid, 1); System.Windows.Controls.Grid.SetRow(NetBarsGrid, 0);
+            NetBarsGrid.Margin = new Thickness(4, 1, 0, 0);
+            NetUpBarContainer.Height = 5; NetDnBarContainer.Height = 5;
+            NetLabel.FontSize = 9;
+
+            CpuSection.Margin = new Thickness(0, 0, 0, 2);
+            RamSection.Margin = new Thickness(0, 0, 0, 2);
+            GpuSection.Margin = new Thickness(0, 0, 0, 2);
+            NetSection.Margin = new Thickness(0, 0, 0, 0);
         }
-        else if (!_netCountersInitialized)
+        else
         {
-            // Never initialized - try again
-            _netRescanCooldown++;
-            if (_netRescanCooldown >= 3)
-            {
-                _netRescanCooldown = 0;
-                RescanNetworkAdapters();
-            }
-        }
+            // Normal: restore 2-row layout
+            SetMetricGridNormal(CpuSection, CpuHeaderRow, CpuBarContainer, CpuLabel);
+            SetMetricGridNormal(RamSection, RamHeaderRow, RamBarContainer, RamLabel);
+            SetMetricGridNormal(GpuSection, GpuHeaderRow, GpuBarContainer, GpuLabel);
 
-        // GPU utilization
-        double gpuUsage = 0;
-        if (_gpuCountersInitialized)
-        {
-            float total = 0;
-            foreach (var c in _gpuCounters)
-                total += c.NextValue();
-            gpuUsage = Math.Round(Math.Min(100, total), 1);
-        }
+            // NET: restore
+            NetSection.ColumnDefinitions.Clear();
+            NetSection.RowDefinitions.Clear();
+            NetSection.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+            NetSection.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+            System.Windows.Controls.Grid.SetColumn(NetHeaderRow, 0); System.Windows.Controls.Grid.SetRow(NetHeaderRow, 0);
+            System.Windows.Controls.Grid.SetColumn(NetBarsGrid, 0); System.Windows.Controls.Grid.SetRow(NetBarsGrid, 1);
+            NetBarsGrid.Margin = new Thickness(0, 3, 0, 0);
+            NetUpBarContainer.Height = 6; NetDnBarContainer.Height = 6;
+            NetLabel.FontSize = 11;
 
-        var data = new
+            CpuSection.Margin = new Thickness(0, 0, 0, 7);
+            RamSection.Margin = new Thickness(0, 0, 0, 7);
+            GpuSection.Margin = new Thickness(0, 0, 0, 7);
+            NetSection.Margin = new Thickness(0, 0, 0, 0);
+        }
+    }
+
+    private void SetMetricGridCompact(System.Windows.Controls.Grid section, System.Windows.Controls.DockPanel header, System.Windows.Controls.Grid bar, System.Windows.Controls.TextBlock label)
+    {
+        section.ColumnDefinitions.Clear();
+        section.RowDefinitions.Clear();
+        section.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(34) });
+        section.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        System.Windows.Controls.Grid.SetColumn(header, 0); System.Windows.Controls.Grid.SetRow(header, 0);
+        System.Windows.Controls.Grid.SetColumn(bar, 1); System.Windows.Controls.Grid.SetRow(bar, 0);
+
+        header.VerticalAlignment = VerticalAlignment.Center;
+        bar.Margin = new Thickness(2, 0, 0, 0);
+        bar.Height = 6;
+        label.FontSize = 9;
+    }
+
+    private void SetMetricGridNormal(System.Windows.Controls.Grid section, System.Windows.Controls.DockPanel header, System.Windows.Controls.Grid bar, System.Windows.Controls.TextBlock label)
+    {
+        section.ColumnDefinitions.Clear();
+        section.RowDefinitions.Clear();
+        section.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+        section.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+
+        System.Windows.Controls.Grid.SetColumn(header, 0); System.Windows.Controls.Grid.SetRow(header, 0);
+        System.Windows.Controls.Grid.SetColumn(bar, 0); System.Windows.Controls.Grid.SetRow(bar, 1);
+
+        header.VerticalAlignment = VerticalAlignment.Top;
+        bar.Margin = new Thickness(0, 3, 0, 0);
+        bar.Height = 8;
+        label.FontSize = 11;
+    }
+
+    // ── Scanline ──
+    private void StartScanlineAnimation()
+    {
+        var anim = new DoubleAnimation
         {
-            type = "systemData",
-            cpu = Math.Round(cpuUsage, 1),
-            memory = Math.Round(memUsage, 1),
-            memoryTotal = Math.Round(totalMem, 0),
-            memoryUsed = Math.Round(totalMem - availableMem, 0),
-            gpu = gpuUsage,
-            gpuName = _gpuName,
-            netUp = netSentKbps,
-            netDown = netRecvKbps,
-            date = DateTime.Now.ToString("yyyy-MM-dd"),
-            time = DateTime.Now.ToString("HH:mm:ss")
+            From = -4,
+            To = ActualHeight + 4,
+            Duration = TimeSpan.FromSeconds(4),
+            RepeatBehavior = RepeatBehavior.Forever
         };
-
-        string json = JsonSerializer.Serialize(data);
-        WebView.CoreWebView2.PostWebMessageAsJson(json);
+        ScanlineTransform.BeginAnimation(TranslateTransform.YProperty, anim);
     }
 
-    private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
-    {
-        var message = e.TryGetWebMessageAsString();
-        if (message == "toggleClickThrough")
-        {
-            ToggleClickThrough();
-        }
-        else if (message == "startDrag")
-        {
-            // Initiate window drag from JS notification
-            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            ReleaseCapture();
-            SendMessage(hwnd, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
-        }
-    }
-
+    // ── Click-through ──
     public void ToggleClickThrough()
     {
         var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
         int style = GetWindowLong(hwnd, GWL_EXSTYLE);
         if ((style & WS_EX_TRANSPARENT) != 0)
-        {
-            // Remove click-through
             SetWindowLong(hwnd, GWL_EXSTYLE, style & ~WS_EX_TRANSPARENT);
-        }
         else
-        {
-            // Add click-through
             SetWindowLong(hwnd, GWL_EXSTYLE, style | WS_EX_TRANSPARENT);
-        }
-    }
-
-    public void ToggleCompactMode()
-    {
-        if (!_isWebViewReady || WebView.CoreWebView2 == null) return;
-        WebView.CoreWebView2.ExecuteScriptAsync(
-            "toggleCompactFromCS()");
     }
 
     public void ShowWindow()
@@ -369,14 +244,211 @@ public partial class MainWindow : Window
         SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
 
+    // ── Data push ──
+    private void PushSystemData(object? sender, EventArgs e)
+    {
+        float cpuUsage = _cpuCounter.NextValue();
+        if (_cpuFirstSample) { _cpuFirstSample = false; return; }
+        float availableMem = _memCounter.NextValue();
+        float totalMem = GetTotalPhysicalMemory();
+        float memUsage = totalMem > 0 ? ((totalMem - availableMem) / totalMem) * 100f : 0f;
+
+        // CPU
+        double cpu = Math.Round(Math.Min(100, Math.Max(0, cpuUsage)), 1);
+        CpuValue.Text = cpu.ToString("F1") + "%";
+        CpuFill.Width = (cpu / 100.0) * CpuBarContainer.ActualWidth;
+        if (cpu > 80)
+        {
+            CpuFill.Fill = FindResource("MagentaBar") as System.Windows.Media.Brush;
+            CpuValue.Foreground = MagentaText;
+        }
+        else
+        {
+            CpuFill.Fill = FindResource("CyanBar") as System.Windows.Media.Brush;
+            CpuValue.Foreground = CyanText;
+        }
+
+        // RAM
+        double mem = Math.Round(Math.Min(100, Math.Max(0, memUsage)), 1);
+        double usedGB = Math.Round((totalMem - availableMem) / 1024.0, 1);
+        double totalGB = Math.Round(totalMem / 1024.0, 1);
+        RamValue.Text = $"{usedGB}/{totalGB} GB";
+        RamFill.Width = (mem / 100.0) * RamBarContainer.ActualWidth;
+        if (mem > 85)
+        {
+            RamFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
+            RamValue.Foreground = YellowText;
+        }
+        else
+        {
+            RamFill.Fill = FindResource("MagentaBar") as System.Windows.Media.Brush;
+            RamValue.Foreground = MagentaText;
+        }
+
+        // GPU
+        double gpu = 0;
+        if (_gpuCountersInitialized)
+        {
+            try
+            {
+                float total = 0;
+                foreach (var c in _gpuCounters)
+                    total += c.NextValue();
+                gpu = Math.Round(Math.Min(100, total), 1);
+            }
+            catch
+            {
+                foreach (var c in _gpuCounters)
+                    try { c.Dispose(); } catch { }
+                _gpuCounters.Clear();
+                _gpuCountersInitialized = false;
+                InitializeGpuCounters();
+            }
+        }
+        GpuValue.Text = _gpuCountersInitialized ? gpu.ToString("F0") + "%" : "N/A";
+        GpuFill.Width = (gpu / 100.0) * GpuBarContainer.ActualWidth;
+
+        // Network
+        double netUpKbps = 0, netDnKbps = 0;
+        if (_netCountersInitialized && _netSentCounter != null && _netReceivedCounter != null)
+        {
+            try
+            {
+                float sentBytes = _netSentCounter.NextValue();
+                float recvBytes = _netReceivedCounter.NextValue();
+                netUpKbps = Math.Round(sentBytes / 1024.0, 1);
+                netDnKbps = Math.Round(recvBytes / 1024.0, 1);
+                if (sentBytes == 0 && recvBytes == 0)
+                {
+                    _netRescanCooldown++;
+                    if (_netRescanCooldown >= 5) { _netRescanCooldown = 0; RescanNetworkAdapters(); }
+                }
+                else { _netRescanCooldown = 0; }
+            }
+            catch { RescanNetworkAdapters(); }
+        }
+        else if (!_netCountersInitialized)
+        {
+            _netRescanCooldown++;
+            if (_netRescanCooldown >= 3) { _netRescanCooldown = 0; RescanNetworkAdapters(); }
+        }
+        NetValue.Text = $"{FmtSpeed(netUpKbps)} / {FmtSpeed(netDnKbps)}";
+        double netMax = 10240;
+        if (NetUpBarContainer.ActualWidth > 0)
+            NetUpFill.Width = Math.Min(1, netUpKbps / netMax) * NetUpBarContainer.ActualWidth;
+        if (NetDnBarContainer.ActualWidth > 0)
+            NetDnFill.Width = Math.Min(1, netDnKbps / netMax) * NetDnBarContainer.ActualWidth;
+
+        // Date & Time
+        DateLabel.Text = DateTime.Now.ToString("yyyy-MM-dd");
+        ClockLabel.Text = DateTime.Now.ToString("HH:mm:ss");
+    }
+
+    private static string FmtSpeed(double kbps)
+    {
+        if (kbps >= 1024) return (kbps / 1024).ToString("F1") + " MB/s";
+        return kbps.ToString("F1") + " KB/s";
+    }
+
+    // ── GPU ──
+    private void InitializeGpuCounters()
+    {
+        try
+        {
+            using var searcher = new ManagementObjectSearcher("SELECT Name, AdapterRAM FROM Win32_VideoController");
+            foreach (ManagementObject obj in searcher.Get())
+            {
+                var name = obj["Name"]?.ToString() ?? "";
+                if (name.Contains("Idd", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("Virtual", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("Mirror", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                _gpuName = name;
+                var vram = obj["AdapterRAM"];
+                if (vram != null) _gpuVramMB = Convert.ToDouble(vram) / (1024.0 * 1024.0);
+                break;
+            }
+        }
+        catch { }
+
+        try
+        {
+            var cat = new PerformanceCounterCategory("GPU Engine");
+            var instances = cat.GetInstanceNames();
+            foreach (var inst in instances)
+            {
+                if (!inst.Contains("engtype_3D")) continue;
+                try
+                {
+                    var counter = new PerformanceCounter("GPU Engine", "Utilization Percentage", inst);
+                    counter.NextValue();
+                    _gpuCounters.Add(counter);
+                }
+                catch { }
+            }
+            _gpuCountersInitialized = _gpuCounters.Count > 0;
+        }
+        catch { }
+    }
+
+    // ── Network ──
+    private void InitializeNetworkCounters()
+    {
+        RescanNetworkAdapters();
+    }
+
+    private void RescanNetworkAdapters()
+    {
+        try
+        {
+            var category = new PerformanceCounterCategory("Network Interface");
+            var instances = category.GetInstanceNames();
+            var candidates = new List<(string name, PerformanceCounter sent, PerformanceCounter recv, float recvBytes)>();
+
+            foreach (var inst in instances)
+            {
+                if (inst.Contains("isatap", StringComparison.OrdinalIgnoreCase) ||
+                    inst.Contains("Teredo", StringComparison.OrdinalIgnoreCase) ||
+                    inst.Contains("Loopback", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                try
+                {
+                    var sentCounter = new PerformanceCounter("Network Interface", "Bytes Sent/sec", inst);
+                    var recvCounter = new PerformanceCounter("Network Interface", "Bytes Received/sec", inst);
+                    sentCounter.NextValue();
+                    float recv = recvCounter.NextValue();
+                    candidates.Add((inst, sentCounter, recvCounter, recv));
+                }
+                catch { continue; }
+            }
+
+            if (candidates.Count > 0)
+            {
+                var best = candidates[0];
+                foreach (var c in candidates)
+                {
+                    if (c.name.Contains("Wi-Fi", StringComparison.OrdinalIgnoreCase) ||
+                        c.name.Contains("Wireless", StringComparison.OrdinalIgnoreCase) ||
+                        c.name.Contains("WLAN", StringComparison.OrdinalIgnoreCase))
+                    { best = c; break; }
+                }
+                _netSentCounter = best.sent;
+                _netReceivedCounter = best.recv;
+                _netAdapterName = best.name;
+                _netCountersInitialized = true;
+            }
+        }
+        catch { }
+    }
+
+    // ── Memory ──
     private static float GetTotalPhysicalMemory()
     {
         try
         {
-            using var proc = Process.GetCurrentProcess();
             var memStatus = new NativeMethods.MEMORYSTATUSEX();
             if (NativeMethods.GlobalMemoryStatusEx(memStatus))
-                return memStatus.ullTotalPhys / 1024f / 1024f; // MB
+                return memStatus.ullTotalPhys / 1024f / 1024f;
         }
         catch { }
         return 0;
