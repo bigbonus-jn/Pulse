@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private readonly ConfigService _config = new();
     private bool _cpuFirstSample = true;
     private bool _isCompact;
+    private int _slowTickCounter;  // counts 1s ticks for 5s slow metrics
 
     // Network monitoring
     private PerformanceCounter? _netSentCounter;
@@ -378,6 +379,21 @@ public partial class MainWindow : Window
         if (NetDnBarContainer.ActualWidth > 0)
             NetDnFill.Width = Math.Min(1, netDnKbps / netMax) * NetDnBarContainer.ActualWidth;
 
+        // Date & Time
+        DateLabel.Text = DateTime.Now.ToString("yyyy-MM-dd");
+        ClockLabel.Text = DateTime.Now.ToString("HH:mm:ss");
+
+        // Slow metrics (every 5s): DISK, TEMP, PROC
+        _slowTickCounter++;
+        if (_slowTickCounter >= 5)
+        {
+            _slowTickCounter = 0;
+            UpdateSlowMetrics();
+        }
+    }
+
+    private void UpdateSlowMetrics()
+    {
         // DISK
         double diskPercent = 0;
         string diskInfo = "N/A";
@@ -447,10 +463,6 @@ public partial class MainWindow : Window
         ProcValue.Text = procCount.ToString();
         ProcValue.Foreground = TealText;
         ProcFill.Width = Math.Min(1, procCount / 300.0) * ProcBarContainer.ActualWidth;
-
-        // Date & Time
-        DateLabel.Text = DateTime.Now.ToString("yyyy-MM-dd");
-        ClockLabel.Text = DateTime.Now.ToString("HH:mm:ss");
     }
 
     private static string FmtSpeed(double kbps)
