@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Management;
+using LibreHardwareMonitor.Hardware;
 
 namespace DesktopWidgets;
 
@@ -36,6 +37,12 @@ public partial class MainWindow : Window
     private static readonly SolidColorBrush MagentaText = new(System.Windows.Media.Color.FromRgb(0xFF, 0x2A, 0x6D));
     private static readonly SolidColorBrush YellowText = new(System.Windows.Media.Color.FromRgb(0xFF, 0xD7, 0x00));
     private static readonly SolidColorBrush WhiteText = new(System.Windows.Media.Color.FromRgb(0xE6, 0xFF, 0xFF));
+    private static readonly SolidColorBrush PurpleText = new(System.Windows.Media.Color.FromRgb(0xBD, 0x93, 0xF9));
+    private static readonly SolidColorBrush RedText = new(System.Windows.Media.Color.FromRgb(0xFF, 0x55, 0x55));
+    private static readonly SolidColorBrush TealText = new(System.Windows.Media.Color.FromRgb(0x00, 0xCE, 0xD1));
+
+    // LibreHardwareMonitor for CPU temperature
+    private readonly Computer _computer;
 
     // Win32 API
     [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr hwnd, int index, int newStyle);
@@ -58,6 +65,10 @@ public partial class MainWindow : Window
         Top = _config.Data.Y;
         Width = _config.Data.Width;
         Height = _config.Data.Height;
+
+        // Initialize LibreHardwareMonitor for CPU temperature
+        _computer = new Computer { IsCpuEnabled = true };
+        try { _computer.Open(); } catch { }
     }
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -103,6 +114,7 @@ public partial class MainWindow : Window
         _config.Save();
         _dataTimer.Stop();
         _notifyIcon?.Dispose();
+        try { _computer.Close(); } catch { }
     }
 
     // ── Drag ──
@@ -133,6 +145,9 @@ public partial class MainWindow : Window
         RamValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         GpuValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         NetValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+        DiskValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+        TempValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+        ProcValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
 
         // NET tags
         NetUpTag.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
@@ -144,6 +159,9 @@ public partial class MainWindow : Window
             SetMetricGridCompact(CpuSection, CpuHeaderRow, CpuBarContainer, CpuLabel);
             SetMetricGridCompact(RamSection, RamHeaderRow, RamBarContainer, RamLabel);
             SetMetricGridCompact(GpuSection, GpuHeaderRow, GpuBarContainer, GpuLabel);
+            SetMetricGridCompact(DiskSection, DiskHeaderRow, DiskBarContainer, DiskLabel);
+            SetMetricGridCompact(TempSection, TempHeaderRow, TempBarContainer, TempLabel);
+            SetMetricGridCompact(ProcSection, ProcHeaderRow, ProcBarContainer, ProcLabel);
 
             // NET: label left, bars right
             NetSection.ColumnDefinitions.Clear();
@@ -159,7 +177,10 @@ public partial class MainWindow : Window
             CpuSection.Margin = new Thickness(0, 0, 0, 2);
             RamSection.Margin = new Thickness(0, 0, 0, 2);
             GpuSection.Margin = new Thickness(0, 0, 0, 2);
-            NetSection.Margin = new Thickness(0, 0, 0, 0);
+            NetSection.Margin = new Thickness(0, 0, 0, 2);
+            DiskSection.Margin = new Thickness(0, 0, 0, 2);
+            TempSection.Margin = new Thickness(0, 0, 0, 2);
+            ProcSection.Margin = new Thickness(0, 0, 0, 0);
         }
         else
         {
@@ -167,6 +188,9 @@ public partial class MainWindow : Window
             SetMetricGridNormal(CpuSection, CpuHeaderRow, CpuBarContainer, CpuLabel);
             SetMetricGridNormal(RamSection, RamHeaderRow, RamBarContainer, RamLabel);
             SetMetricGridNormal(GpuSection, GpuHeaderRow, GpuBarContainer, GpuLabel);
+            SetMetricGridNormal(DiskSection, DiskHeaderRow, DiskBarContainer, DiskLabel);
+            SetMetricGridNormal(TempSection, TempHeaderRow, TempBarContainer, TempLabel);
+            SetMetricGridNormal(ProcSection, ProcHeaderRow, ProcBarContainer, ProcLabel);
 
             // NET: restore
             NetSection.ColumnDefinitions.Clear();
@@ -182,7 +206,10 @@ public partial class MainWindow : Window
             CpuSection.Margin = new Thickness(0, 0, 0, 7);
             RamSection.Margin = new Thickness(0, 0, 0, 7);
             GpuSection.Margin = new Thickness(0, 0, 0, 7);
-            NetSection.Margin = new Thickness(0, 0, 0, 0);
+            NetSection.Margin = new Thickness(0, 0, 0, 7);
+            DiskSection.Margin = new Thickness(0, 0, 0, 7);
+            TempSection.Margin = new Thickness(0, 0, 0, 7);
+            ProcSection.Margin = new Thickness(0, 0, 0, 0);
         }
     }
 
@@ -350,6 +377,76 @@ public partial class MainWindow : Window
             NetUpFill.Width = Math.Min(1, netUpKbps / netMax) * NetUpBarContainer.ActualWidth;
         if (NetDnBarContainer.ActualWidth > 0)
             NetDnFill.Width = Math.Min(1, netDnKbps / netMax) * NetDnBarContainer.ActualWidth;
+
+        // DISK
+        double diskPercent = 0;
+        string diskInfo = "N/A";
+        try
+        {
+            var drive = System.IO.DriveInfo.GetDrives()
+                .FirstOrDefault(d => d.IsReady && d.RootDirectory.FullName == "C:\\");
+            if (drive != null)
+            {
+                double diskTotalGB = Math.Round(drive.TotalSize / (1024.0 * 1024 * 1024), 0);
+                double diskUsedGB = Math.Round((drive.TotalSize - drive.AvailableFreeSpace) / (1024.0 * 1024 * 1024), 1);
+                diskPercent = Math.Round((1.0 - (double)drive.AvailableFreeSpace / drive.TotalSize) * 100, 1);
+                diskInfo = $"{diskUsedGB:F0}/{diskTotalGB:F0} GB";
+            }
+        }
+        catch { }
+        DiskValue.Text = diskInfo;
+        DiskValue.Foreground = diskPercent > 90 ? RedText : PurpleText;
+        DiskFill.Width = (diskPercent / 100.0) * DiskBarContainer.ActualWidth;
+        if (diskPercent > 90)
+            DiskFill.Fill = FindResource("RedBar") as System.Windows.Media.Brush;
+        else
+            DiskFill.Fill = FindResource("PurpleBar") as System.Windows.Media.Brush;
+
+        // TEMP (CPU temperature via LibreHardwareMonitor)
+        double cpuTemp = 0;
+        bool tempAvailable = false;
+        try
+        {
+            foreach (var hardware in _computer.Hardware)
+            {
+                hardware.Update();
+                foreach (var sensor in hardware.Sensors)
+                {
+                    if (sensor.SensorType == SensorType.Temperature && sensor.Value.HasValue)
+                    {
+                        cpuTemp = Math.Round(sensor.Value.Value, 0);
+                        tempAvailable = true;
+                        break;
+                    }
+                }
+                if (tempAvailable) break;
+            }
+        }
+        catch { }
+        TempValue.Text = tempAvailable ? $"{cpuTemp:F0}°C" : "N/A";
+        if (tempAvailable)
+        {
+            TempValue.Foreground = cpuTemp > 80 ? RedText : cpuTemp > 60 ? YellowText : CyanText;
+            TempFill.Width = (cpuTemp / 100.0) * TempBarContainer.ActualWidth;
+            if (cpuTemp > 80)
+                TempFill.Fill = FindResource("RedBar") as System.Windows.Media.Brush;
+            else if (cpuTemp > 60)
+                TempFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
+            else
+                TempFill.Fill = FindResource("CyanBar") as System.Windows.Media.Brush;
+        }
+        else
+        {
+            TempValue.Foreground = RedText;
+            TempFill.Width = 0;
+        }
+
+        // PROC (process count)
+        int procCount = 0;
+        try { procCount = Process.GetProcesses().Length; } catch { }
+        ProcValue.Text = procCount.ToString();
+        ProcValue.Foreground = TealText;
+        ProcFill.Width = Math.Min(1, procCount / 300.0) * ProcBarContainer.ActualWidth;
 
         // Date & Time
         DateLabel.Text = DateTime.Now.ToString("yyyy-MM-dd");
