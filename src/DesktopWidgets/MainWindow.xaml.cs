@@ -20,9 +20,11 @@ public partial class MainWindow : Window
     private bool _cpuFirstSample = true;
     private bool _isCompact;
     private bool _isPinned = true;  // topmost pin state
+    private bool _isLocked;        // lock position (prevent drag)
     private bool _isDraggingOpacity;  // opacity bar drag state
     private double _bgAlpha = 1.0;  // background alpha 0.2~1.0
     private int _slowTickCounter;  // counts 1s ticks for 5s slow metrics
+    private int _ipTickCounter;    // counts 1s ticks for 30s IP/DNS refresh
 
     // Network monitoring
     private PerformanceCounter? _netSentCounter;
@@ -80,6 +82,9 @@ public partial class MainWindow : Window
         _isPinned = _config.Data.Topmost;
         Topmost = _isPinned;
 
+        // Restore lock state
+        _isLocked = _config.Data.Locked;
+
         // Restore opacity (background alpha only, not window opacity)
         var bgAlpha = Math.Clamp(_config.Data.Opacity, 0.2, 1.0);
         _bgAlpha = bgAlpha;
@@ -99,6 +104,7 @@ public partial class MainWindow : Window
         InitializeNetworkCounters();
         InitializeGpuCounters();
         UpdatePinButtonVisual();
+        UpdateLockButtonVisual();
         UpdateOpacityBarVisual();
 
         // Sync auto-start state from config to registry
@@ -143,7 +149,7 @@ public partial class MainWindow : Window
     // ── Drag ──
     private void TopBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        DragMove();
+        if (!_isLocked) DragMove();
     }
 
     // ── Compact mode ──
@@ -169,6 +175,7 @@ public partial class MainWindow : Window
         GpuValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         NetValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         PingValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+        WifiValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         // ADDR & DNS: always show values (text-only, no bar)
         TempValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         ProcValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
@@ -188,6 +195,8 @@ public partial class MainWindow : Window
             SetMetricGridCompact(RamSection, RamHeaderRow, RamBarContainer, RamLabel);
             SetMetricGridCompact(GpuSection, GpuHeaderRow, GpuBarContainer, GpuLabel);
             SetMetricGridCompact(PingSection, PingHeaderRow, PingBarContainer, PingLabel);
+            PingLabel.Text = "DELAY";
+            SetMetricGridCompact(WifiSection, WifiHeaderRow, WifiBarContainer, WifiLabel);
             SetMetricGridCompact(ProcSection, ProcHeaderRow, ProcBarContainer, ProcLabel);
 
             // NET: label left, bars right
@@ -223,6 +232,7 @@ public partial class MainWindow : Window
             GpuSection.Margin = new Thickness(0, 0, 0, 2);
             NetSection.Margin = new Thickness(0, 0, 0, 2);
             PingSection.Margin = new Thickness(0, 0, 0, 2);
+            WifiSection.Margin = new Thickness(0, 0, 0, 2);
             AddrSection.Margin = new Thickness(0, 0, 0, 2);
             DnsSection.Margin = new Thickness(0, 0, 0, 2);
             ProcSection.Margin = new Thickness(0, 0, 0, 2);
@@ -235,6 +245,8 @@ public partial class MainWindow : Window
             SetMetricGridNormal(RamSection, RamHeaderRow, RamBarContainer, RamLabel);
             SetMetricGridNormal(GpuSection, GpuHeaderRow, GpuBarContainer, GpuLabel);
             SetMetricGridNormal(PingSection, PingHeaderRow, PingBarContainer, PingLabel);
+            PingLabel.Text = "DELAY(223.5.5.5)";
+            SetMetricGridNormal(WifiSection, WifiHeaderRow, WifiBarContainer, WifiLabel);
             SetMetricGridNormal(ProcSection, ProcHeaderRow, ProcBarContainer, ProcLabel);
 
             // NET: restore
@@ -270,11 +282,21 @@ public partial class MainWindow : Window
             GpuSection.Margin = new Thickness(0, 0, 0, 7);
             NetSection.Margin = new Thickness(0, 0, 0, 7);
             PingSection.Margin = new Thickness(0, 0, 0, 7);
+            WifiSection.Margin = new Thickness(0, 0, 0, 7);
             AddrSection.Margin = new Thickness(0, 0, 0, 7);
             DnsSection.Margin = new Thickness(0, 0, 0, 7);
             ProcSection.Margin = new Thickness(0, 0, 0, 7);
             TempSection.Margin = new Thickness(0, 0, 0, 0);
         }
+
+        // Resize window to fit content after compact/normal switch
+        SizeToContent = System.Windows.SizeToContent.Height;
+        Dispatcher.BeginInvoke(() =>
+        {
+            var newHeight = ActualHeight;
+            SizeToContent = System.Windows.SizeToContent.Manual;
+            Height = newHeight;
+        }, DispatcherPriority.Loaded);
     }
 
     private void SetMetricGridCompact(System.Windows.Controls.Grid section, System.Windows.Controls.DockPanel header, System.Windows.Controls.Grid bar, System.Windows.Controls.TextBlock label)
@@ -346,9 +368,27 @@ public partial class MainWindow : Window
 
     private void UpdatePinButtonVisual()
     {
-        // ◆ = pinned (filled diamond), ◇ = unpinned (hollow diamond)
-        PinToggle.Content = _isPinned ? "\u25C6" : "\u25C7";
+        // T = pinned (topmost), t = unpinned
+        PinToggle.Content = _isPinned ? "T" : "t";
         PinToggle.Foreground = _isPinned
+            ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x00, 0xFF, 0xF9))
+            : new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x60, 0x60, 0x60));
+    }
+
+    // ── Lock position toggle ──
+    private void LockToggle_Click(object sender, RoutedEventArgs e)
+    {
+        _isLocked = !_isLocked;
+        _config.Data.Locked = _isLocked;
+        _config.Save();
+        UpdateLockButtonVisual();
+    }
+
+    private void UpdateLockButtonVisual()
+    {
+        // L = locked, l = unlocked
+        LockToggle.Content = _isLocked ? "L" : "l";
+        LockToggle.Foreground = _isLocked
             ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x00, 0xFF, 0xF9))
             : new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x60, 0x60, 0x60));
     }
@@ -526,12 +566,38 @@ public partial class MainWindow : Window
         DateLabel.Text = DateTime.Now.ToString("yyyy-MM-dd");
         ClockLabel.Text = DateTime.Now.ToString("HH:mm:ss");
 
-        // Slow metrics (every 5s): DISK, TEMP, PROC
+        // Position UptimeLabel to the right of the centered clock
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (ClockLabel.ActualWidth > 0)
+            {
+                var bar = (FrameworkElement)ClockLabel.Parent;
+                double barCenter = bar.ActualWidth / 2;
+                double clockRight = barCenter + ClockLabel.ActualWidth / 2;
+                UptimeLabel.Margin = new Thickness(clockRight + 4, 0, 0, 0);
+            }
+        });
+
+        // Uptime (every 1s — very cheap)
+        UpdateUptime();
+
+        // DELAY / PING (every 1s — moved from slow metrics for responsiveness)
+        UpdatePing();
+
+        // Slow metrics (every 5s): TEMP, PROC
         _slowTickCounter++;
         if (_slowTickCounter >= 5)
         {
             _slowTickCounter = 0;
             UpdateSlowMetrics();
+        }
+
+        // IP / DNS (every 30s — rarely changes, low refresh is fine)
+        _ipTickCounter++;
+        if (_ipTickCounter >= 30)
+        {
+            _ipTickCounter = 0;
+            UpdateIpDns();
         }
     }
 
@@ -688,15 +754,33 @@ public partial class MainWindow : Window
         }
         if (gpuTempAvailable) TempGpuTag.Foreground = FindResource("YellowBar") as System.Windows.Media.Brush;
 
-        // PING (latency to Alibaba DNS 223.5.5.5)
+        // PROC (process count)
+        int procCount = 0;
+        try { procCount = Process.GetProcesses().Length; } catch { }
+        ProcValue.Text = procCount.ToString();
+        ProcValue.Foreground = TealText;
+        ProcFill.Width = Math.Min(1, procCount / 300.0) * ProcBarContainer.ActualWidth;
+
+        // WIFI (signal strength via WMI)
+        UpdateWifiSignal();
+    }
+
+    private bool _pingInProgress;  // prevent overlapping async pings
+
+    private async void UpdatePing()
+    {
+        if (_pingInProgress) return;  // skip if previous ping hasn't returned
+        _pingInProgress = true;
         long pingMs = -1;
         try
         {
-            var reply = _pingSender.Send(PingTarget, 2000);
+            var reply = await _pingSender.SendPingAsync(PingTarget, 2000);
             if (reply.Status == IPStatus.Success)
                 pingMs = reply.RoundtripTime;
         }
         catch { }
+        _pingInProgress = false;
+
         if (pingMs >= 0)
         {
             PingValue.Text = $"{pingMs}ms";
@@ -723,41 +807,166 @@ public partial class MainWindow : Window
             PingValue.Foreground = DimText;
             PingFill.Width = 0;
         }
+    }
 
-        // IP / DNS
-        string localIp = "N/A";
+    private void UpdateIpDns()
+    {
+        string localIps = "N/A";
         string dnsServer = "N/A";
         try
         {
+            // Collect candidates: UP, non-loopback, non-virtual adapters with a valid IPv4
+            var candidates = new List<(NetworkInterface ni, System.Net.IPAddress ip, System.Net.IPAddress? dns, bool hasGateway)>();
+
             foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
             {
                 if (ni.OperationalStatus != OperationalStatus.Up) continue;
                 if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
 
+                // Filter out virtual / tunnel adapters
+                string name = ni.Name;
+                string desc = ni.Description;
+                if (name.Contains("Hyper-V", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("vEthernet", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("WSL", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("Docker", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("Tunnel", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("isatap", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("Teredo", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("6to4", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("VMware", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("VMnet", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("TAP", StringComparison.OrdinalIgnoreCase) ||
+                    desc.Contains("VMware", StringComparison.OrdinalIgnoreCase) ||
+                    desc.Contains("Virtual", StringComparison.OrdinalIgnoreCase) ||
+                    desc.Contains("TAP-Windows", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
                 var ipProps = ni.GetIPProperties();
                 var unicast = ipProps.UnicastAddresses
                     .FirstOrDefault(a => a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
                                       && !a.Address.ToString().StartsWith("169."));
-                if (unicast != null)
-                {
-                    localIp = unicast.Address.ToString();
-                    var dns = ipProps.DnsAddresses
-                        .FirstOrDefault(d => d.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
-                    if (dns != null) dnsServer = dns.ToString();
-                    break;
-                }
+                if (unicast == null) continue;
+
+                var dns = ipProps.DnsAddresses
+                    .FirstOrDefault(d => d.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+
+                bool hasGateway = ipProps.GatewayAddresses
+                    .Any(g => g.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+
+                candidates.Add((ni, unicast.Address, dns, hasGateway));
+            }
+
+            if (candidates.Count > 0)
+            {
+                // Primary adapter = one with default gateway (internet route)
+                var primary = candidates.FirstOrDefault(c => c.hasGateway);
+                if (primary.ni == null) primary = candidates[0];
+
+                // DNS from primary adapter only
+                if (primary.dns != null) dnsServer = primary.dns.ToString();
+
+                // Show all IPs: primary first, then others (gateway-prioritized order)
+                var ordered = candidates
+                    .OrderByDescending(c => c.hasGateway)
+                    .ThenBy(c => c.ni.NetworkInterfaceType != NetworkInterfaceType.Wireless80211)  // WiFi next
+                    .Select(c => c.ip.ToString())
+                    .ToList();
+                localIps = string.Join(" / ", ordered);
             }
         }
         catch { }
-        AddrValue.Text = localIp;
+        AddrValue.Text = localIps;
         DnsValue.Text = dnsServer;
+    }
 
-        // PROC (process count)
-        int procCount = 0;
-        try { procCount = Process.GetProcesses().Length; } catch { }
-        ProcValue.Text = procCount.ToString();
-        ProcValue.Foreground = TealText;
-        ProcFill.Width = Math.Min(1, procCount / 300.0) * ProcBarContainer.ActualWidth;
+    private void UpdateUptime()
+    {
+        try
+        {
+            using var searcher = new ManagementObjectSearcher("SELECT LastBootUpTime FROM Win32_OperatingSystem");
+            foreach (ManagementObject obj in searcher.Get())
+            {
+                var bootTimeStr = obj["LastBootUpTime"]?.ToString();
+                if (bootTimeStr == null) continue;
+                // WMI datetime format: 20260706103000.500000+480
+                var bootTime = ManagementDateTimeConverter.ToDateTime(bootTimeStr);
+                var span = DateTime.Now - bootTime;
+
+                var parts = new List<string>();
+                if (span.Days > 0) parts.Add($"{span.Days}d");
+                parts.Add($"{span.Hours}h");
+                parts.Add($"{span.Minutes}m");
+                UptimeLabel.Text = "(" + string.Join("", parts) + ")";
+                return;
+            }
+        }
+        catch { }
+    }
+
+    private void UpdateWifiSignal()
+    {
+        // Use netsh wlan show interfaces — most reliable across Windows versions
+        try
+        {
+            var psi = new ProcessStartInfo("netsh", "wlan show interfaces")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardOutputEncoding = System.Text.Encoding.UTF8
+            };
+            using var proc = Process.Start(psi);
+            if (proc == null) { SetWifiNA(); return; }
+            var output = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit(5000);
+
+            // Check if connected
+            if (!output.Contains("connected", StringComparison.OrdinalIgnoreCase))
+            { SetWifiNA(); return; }
+
+            // Parse "信号" or "Signal" line: "    Signal                 : 86%"
+            var match = System.Text.RegularExpressions.Regex.Match(
+                output, @"(?:信号|Signal)\s*:\s*(\d+)%",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (match.Success)
+            {
+                int percent = int.Parse(match.Groups[1].Value);
+                int dbm = (percent / 2) - 100;  // Windows formula: percent = 2*(dBm+100)
+                WifiValue.Text = $"{dbm}dBm";
+                if (WifiBarContainer.ActualWidth > 0)
+                    WifiFill.Width = (percent / 100.0) * WifiBarContainer.ActualWidth;
+
+                if (percent < 25)
+                {
+                    WifiFill.Fill = FindResource("RedBar") as System.Windows.Media.Brush;
+                    WifiValue.Foreground = RedText;
+                }
+                else if (percent < 50)
+                {
+                    WifiFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
+                    WifiValue.Foreground = YellowText;
+                }
+                else
+                {
+                    WifiFill.Fill = FindResource("GreenBar") as System.Windows.Media.Brush;
+                    WifiValue.Foreground = FindResource("GreenBar") as System.Windows.Media.Brush;
+                }
+            }
+            else
+            {
+                SetWifiNA();
+            }
+        }
+        catch { SetWifiNA(); }
+    }
+
+    private void SetWifiNA()
+    {
+        WifiValue.Text = "N/A";
+        WifiValue.Foreground = DimText;
+        WifiFill.Width = 0;
     }
 
     private static string FmtSpeed(double kbps)

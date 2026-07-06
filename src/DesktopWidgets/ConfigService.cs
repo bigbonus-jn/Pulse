@@ -13,6 +13,7 @@ public class WidgetConfig
     public bool ClickThrough { get; set; } = false;
     public bool AutoStart { get; set; } = false;
     public double Opacity { get; set; } = 1.0;  // 0.2 ~ 1.0
+    public bool Locked { get; set; } = false;   // lock position
 }
 
 public class ConfigService
