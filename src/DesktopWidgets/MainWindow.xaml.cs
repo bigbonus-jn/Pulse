@@ -19,6 +19,8 @@ public partial class MainWindow : Window
     private bool _cpuFirstSample = true;
     private bool _isCompact;
     private bool _isPinned = true;  // topmost pin state
+    private bool _isDraggingOpacity;  // opacity bar drag state
+    private double _bgAlpha = 1.0;  // background alpha 0.2~1.0
     private int _slowTickCounter;  // counts 1s ticks for 5s slow metrics
 
     // Network monitoring
@@ -75,7 +77,7 @@ public partial class MainWindow : Window
 
         // Restore opacity (background alpha only, not window opacity)
         var bgAlpha = Math.Clamp(_config.Data.Opacity, 0.2, 1.0);
-        OpacitySlider.Value = bgAlpha * 100;
+        _bgAlpha = bgAlpha;
         ApplyBackgroundAlpha(bgAlpha);
 
         // Initialize LibreHardwareMonitor for CPU/GPU temperature
@@ -92,6 +94,7 @@ public partial class MainWindow : Window
         InitializeNetworkCounters();
         InitializeGpuCounters();
         UpdatePinButtonVisual();
+        UpdateOpacityBarVisual();
 
         // Sync auto-start state from config to registry
         var autoStart = new AutoStartService();
@@ -317,21 +320,53 @@ public partial class MainWindow : Window
             : new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x60, 0x60, 0x60));
     }
 
-    // ── Opacity slider (background alpha only) ──
-    private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    // ── Opacity bar (cyberpunk custom control) ──
+    private void OpacityBar_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        if (RootBorder == null) return;  // slider fires before InitializeComponent
-        var bgAlpha = Math.Clamp(e.NewValue / 100.0, 0.2, 1.0);
-        ApplyBackgroundAlpha(bgAlpha);
-        _config.Data.Opacity = bgAlpha;
+        _isDraggingOpacity = true;
+        UpdateOpacityFromMouse(e);
+        ((System.Windows.IInputElement)sender).CaptureMouse();
+    }
+
+    private void OpacityBar_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (_isDraggingOpacity) UpdateOpacityFromMouse(e);
+    }
+
+    private void OpacityBar_MouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        _isDraggingOpacity = false;
+        ((System.Windows.IInputElement)sender).ReleaseMouseCapture();
+    }
+
+    private void UpdateOpacityFromMouse(System.Windows.Input.MouseEventArgs e)
+    {
+        if (OpacityBar == null) return;
+        var pos = e.GetPosition(OpacityBar);
+        double ratio = Math.Clamp(pos.X / OpacityBar.ActualWidth, 0, 1);
+        _bgAlpha = 0.2 + ratio * 0.8;  // map 0~1 → 0.2~1.0
+        ApplyBackgroundAlpha(_bgAlpha);
+        UpdateOpacityBarVisual();
+        _config.Data.Opacity = _bgAlpha;
         _config.Save();
     }
 
     private void ApplyBackgroundAlpha(double alpha)
     {
-        // Base color: #0A0A14, adjust only the alpha channel
+        if (RootBorder == null) return;
         byte a = (byte)Math.Round(alpha * 255);
         RootBorder.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(a, 0x0A, 0x0A, 0x14));
+    }
+
+    private void UpdateOpacityBarVisual()
+    {
+        if (OpacityBar == null || OpacityFill == null || OpacityThumb == null) return;
+        double ratio = (_bgAlpha - 0.2) / 0.8;  // 0~1
+        double fillWidth = ratio * OpacityBar.ActualWidth;
+        OpacityFill.Width = Math.Max(0, fillWidth);
+        // Position thumb at the end of the fill
+        OpacityThumb.SetValue(System.Windows.FrameworkElement.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Left);
+        OpacityThumb.Margin = new Thickness(Math.Max(0, fillWidth - 3), 0, 0, 0);
     }
 
     // ── Click-through ──
