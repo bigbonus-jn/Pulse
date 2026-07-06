@@ -12,6 +12,7 @@ public class WidgetConfig
     public bool Topmost { get; set; } = true;
     public bool ClickThrough { get; set; } = false;
     public bool AutoStart { get; set; } = false;
+    public double Opacity { get; set; } = 1.0;  // 0.2 ~ 1.0
 }
 
 public class ConfigService

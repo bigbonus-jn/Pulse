@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private readonly ConfigService _config = new();
     private bool _cpuFirstSample = true;
     private bool _isCompact;
+    private bool _isPinned = true;  // topmost pin state
     private int _slowTickCounter;  // counts 1s ticks for 5s slow metrics
 
     // Network monitoring
@@ -68,6 +69,15 @@ public partial class MainWindow : Window
         Width = _config.Data.Width;
         Height = _config.Data.Height;
 
+        // Restore topmost state
+        _isPinned = _config.Data.Topmost;
+        Topmost = _isPinned;
+
+        // Restore opacity
+        var opacity = Math.Clamp(_config.Data.Opacity, 0.2, 1.0);
+        Opacity = opacity;
+        OpacitySlider.Value = opacity * 100;
+
         // Initialize LibreHardwareMonitor for CPU/GPU temperature
         _computer = new Computer { IsCpuEnabled = true, IsGpuEnabled = true, IsStorageEnabled = true };
         try { _computer.Open(); } catch { }
@@ -81,6 +91,7 @@ public partial class MainWindow : Window
         _dataTimer.Start();
         InitializeNetworkCounters();
         InitializeGpuCounters();
+        UpdatePinButtonVisual();
 
         // Sync auto-start state from config to registry
         var autoStart = new AutoStartService();
@@ -92,7 +103,9 @@ public partial class MainWindow : Window
     {
         var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
         SetWindowLong(hwnd, GWL_EXSTYLE, GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW);
-        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        if (_isPinned)
+            SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        UpdatePinButtonVisual();
     }
 
     protected override void OnLocationChanged(EventArgs e)
@@ -192,8 +205,8 @@ public partial class MainWindow : Window
             RamSection.Margin = new Thickness(0, 0, 0, 2);
             GpuSection.Margin = new Thickness(0, 0, 0, 2);
             NetSection.Margin = new Thickness(0, 0, 0, 2);
-            TempSection.Margin = new Thickness(0, 0, 0, 2);
-            ProcSection.Margin = new Thickness(0, 0, 0, 0);
+            ProcSection.Margin = new Thickness(0, 0, 0, 2);
+            TempSection.Margin = new Thickness(0, 0, 0, 0);
         }
         else
         {
@@ -229,8 +242,8 @@ public partial class MainWindow : Window
             RamSection.Margin = new Thickness(0, 0, 0, 7);
             GpuSection.Margin = new Thickness(0, 0, 0, 7);
             NetSection.Margin = new Thickness(0, 0, 0, 7);
-            TempSection.Margin = new Thickness(0, 0, 0, 7);
-            ProcSection.Margin = new Thickness(0, 0, 0, 0);
+            ProcSection.Margin = new Thickness(0, 0, 0, 7);
+            TempSection.Margin = new Thickness(0, 0, 0, 0);
         }
     }
 
@@ -277,6 +290,41 @@ public partial class MainWindow : Window
             RepeatBehavior = RepeatBehavior.Forever
         };
         ScanlineTransform.BeginAnimation(TranslateTransform.YProperty, anim);
+    }
+
+    // ── Pin / Topmost toggle ──
+    private void PinToggle_Click(object sender, RoutedEventArgs e)
+    {
+        _isPinned = !_isPinned;
+        Topmost = _isPinned;
+        _config.Data.Topmost = _isPinned;
+        _config.Save();
+        UpdatePinButtonVisual();
+
+        if (_isPinned)
+        {
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+    }
+
+    private void UpdatePinButtonVisual()
+    {
+        // ◆ = pinned (filled diamond), ◇ = unpinned (hollow diamond)
+        PinToggle.Content = _isPinned ? "\u25C6" : "\u25C7";
+        PinToggle.Foreground = _isPinned
+            ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x00, 0xFF, 0xF9))
+            : new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x60, 0x60, 0x60));
+    }
+
+    // ── Opacity slider ──
+    private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (RootBorder == null) return;  // slider fires before InitializeComponent
+        var opacity = Math.Clamp(e.NewValue / 100.0, 0.2, 1.0);
+        Opacity = opacity;
+        _config.Data.Opacity = opacity;
+        _config.Save();
     }
 
     // ── Click-through ──
