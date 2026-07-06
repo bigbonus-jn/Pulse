@@ -66,6 +66,44 @@
         <DropShadowEffect x:Key="PurpleGlow" ShadowDepth="0" BlurRadius="6" Color="#BD93F9" Opacity="0.6"/>
         <DropShadowEffect x:Key="RedGlow" ShadowDepth="0" BlurRadius="6" Color="#FF5555" Opacity="0.6"/>
         <DropShadowEffect x:Key="TealGlow" ShadowDepth="0" BlurRadius="6" Color="#00CED1" Opacity="0.6"/>
+        <!-- Cyberpunk thin scrollbar -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Width" Value="6"/>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Vertical">
+                    <Setter Property="Width" Value="6"/>
+                    <Setter Property="Height" Value="Auto"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ScrollBar">
+                                <Grid>
+                                    <Border Background="#0A000000" CornerRadius="3" Width="6"/>
+                                    <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                        <Track.DecreaseRepeatButton>
+                                            <RepeatButton Command="ScrollBar.PageUpCommand" Background="Transparent"/>
+                                        </Track.DecreaseRepeatButton>
+                                        <Track.IncreaseRepeatButton>
+                                            <RepeatButton Command="ScrollBar.PageDownCommand" Background="Transparent"/>
+                                        </Track.IncreaseRepeatButton>
+                                        <Track.Thumb>
+                                            <Thumb>
+                                                <Thumb.Template>
+                                                    <ControlTemplate TargetType="Thumb">
+                                                        <Border Background="#5000FFF9" CornerRadius="2" Width="4"/>
+                                                    </ControlTemplate>
+                                                </Thumb.Template>
+                                            </Thumb>
+                                        </Track.Thumb>
+                                    </Track>
+                                </Grid>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
     </Window.Resources>
 
     <Border x:Name="RootBorder" Background="#0A0A14"
@@ -169,7 +207,7 @@
                     <!-- Left: version + opacity bar -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
                                 HorizontalAlignment="Left" Margin="10,0,0,0">
-                        <TextBlock Text="v0.7" FontFamily="Consolas" FontSize="9"
+                         <TextBlock Text="v0.9" FontFamily="Consolas" FontSize="9"
                                    Foreground="#26FFFFFF" VerticalAlignment="Center"
                                    Margin="0,0,6,0"/>
                         <Grid x:Name="OpacityBar" Width="60" Height="14"
@@ -213,7 +251,11 @@
                             Effect="{StaticResource RedGlow}"/>
                 </Grid>
 
-                <!-- Metrics content -->
+                <!-- Metrics content (scrollable) -->
+                <ScrollViewer x:Name="MetricsScroll"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              CanContentScroll="False">
                 <StackPanel Margin="10,8,10,6" VerticalAlignment="Top">
                     <!-- CPU -->
                     <Grid x:Name="CpuSection" Margin="0,0,0,7">
@@ -366,7 +408,7 @@
                              <RowDefinition Height="Auto"/>
                          </Grid.RowDefinitions>
                          <DockPanel x:Name="PingHeaderRow" Grid.Row="0">
-                              <TextBlock x:Name="PingLabel" Text="PING" FontFamily="Consolas"
+                               <TextBlock x:Name="PingLabel" Text="DELAY" FontFamily="Consolas"
                                          FontSize="11" FontWeight="Bold" Foreground="#39FF14"
                                          Effect="{StaticResource CyanGlow}"/>
                               <TextBlock x:Name="PingValue" Text="N/A" FontFamily="Consolas"
@@ -393,40 +435,30 @@
                          </Grid>
                      </Grid>
 
-                     <!-- IP / DNS (dual-column like NET) -->
-                     <Grid x:Name="IpSection" Margin="0,0,0,7">
-                         <Grid.RowDefinitions>
-                             <RowDefinition Height="Auto"/>
-                             <RowDefinition Height="Auto"/>
-                         </Grid.RowDefinitions>
-                         <DockPanel x:Name="IpHeaderRow" Grid.Row="0">
-                              <TextBlock x:Name="IpLabel" Text="IP" FontFamily="Consolas"
+                     <!-- ADDR (local IP address) -->
+                     <Grid x:Name="AddrSection" Margin="0,0,0,7">
+                         <DockPanel x:Name="AddrHeaderRow">
+                              <TextBlock x:Name="AddrLabel" Text="ADDR" FontFamily="Consolas"
                                          FontSize="11" FontWeight="Bold" Foreground="#BD93F9"
                                          Effect="{StaticResource PurpleGlow}"/>
-                              <TextBlock x:Name="IpValue" Text="N/A" FontFamily="Consolas"
+                              <TextBlock x:Name="AddrValue" Text="N/A" FontFamily="Consolas"
                                          FontSize="11" Foreground="#BD93F9"
                                          HorizontalAlignment="Right"
                                          Effect="{StaticResource PurpleGlow}"/>
                          </DockPanel>
-                         <Grid Grid.Row="1" Margin="0,2,0,0" x:Name="IpBarsGrid">
-                             <Grid.ColumnDefinitions>
-                                 <ColumnDefinition Width="*"/>
-                                 <ColumnDefinition Width="6"/>
-                                 <ColumnDefinition Width="*"/>
-                             </Grid.ColumnDefinitions>
-                             <StackPanel Grid.Column="0">
-                                 <TextBlock x:Name="IpAddrTag" Text="ADDR" FontFamily="Consolas"
-                                            FontSize="9" Foreground="#B3BD93F9" Margin="0,0,0,1"/>
-                                 <TextBlock x:Name="IpAddrValue" Text="N/A" FontFamily="Consolas"
-                                            FontSize="9" Foreground="#80BD93F9"/>
-                             </StackPanel>
-                             <StackPanel Grid.Column="2">
-                                 <TextBlock x:Name="IpDnsTag" Text="DNS" FontFamily="Consolas"
-                                            FontSize="9" Foreground="#B3BD93F9" Margin="0,0,0,1"/>
-                                 <TextBlock x:Name="IpDnsValue" Text="N/A" FontFamily="Consolas"
-                                            FontSize="9" Foreground="#80BD93F9"/>
-                             </StackPanel>
-                         </Grid>
+                     </Grid>
+
+                     <!-- DNS -->
+                     <Grid x:Name="DnsSection" Margin="0,0,0,7">
+                         <DockPanel x:Name="DnsHeaderRow">
+                              <TextBlock x:Name="DnsLabel" Text="DNS" FontFamily="Consolas"
+                                         FontSize="11" FontWeight="Bold" Foreground="#BD93F9"
+                                         Effect="{StaticResource PurpleGlow}"/>
+                              <TextBlock x:Name="DnsValue" Text="N/A" FontFamily="Consolas"
+                                         FontSize="11" Foreground="#BD93F9"
+                                         HorizontalAlignment="Right"
+                                         Effect="{StaticResource PurpleGlow}"/>
+                         </DockPanel>
                      </Grid>
 
                       <!-- PROC -->
@@ -504,8 +536,9 @@
                              </StackPanel>
                          </Grid>
                      </Grid>
-                </StackPanel>
-            </DockPanel>
-        </Grid>
-    </Border>
-</Window>
+                 </StackPanel>
+                </ScrollViewer>
+             </DockPanel>
+         </Grid>
+     </Border>
+ </Window>

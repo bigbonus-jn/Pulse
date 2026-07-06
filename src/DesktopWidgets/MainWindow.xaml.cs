@@ -169,7 +169,7 @@ public partial class MainWindow : Window
         GpuValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         NetValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         PingValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
-        IpValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+        // ADDR & DNS: always show values (text-only, no bar)
         TempValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         ProcValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
 
@@ -180,12 +180,6 @@ public partial class MainWindow : Window
         // TEMP tags
         TempCpuTag.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         TempGpuTag.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
-
-        // IP tags
-        IpAddrTag.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
-        IpDnsTag.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
-        IpAddrValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
-        IpDnsValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
 
         if (_isCompact)
         {
@@ -207,15 +201,11 @@ public partial class MainWindow : Window
             NetUpBarContainer.Height = 5; NetDnBarContainer.Height = 5;
             NetLabel.FontSize = 9;
 
-            // IP: label left, info right (same as NET)
-            IpSection.ColumnDefinitions.Clear();
-            IpSection.RowDefinitions.Clear();
-            IpSection.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(22) });
-            IpSection.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            System.Windows.Controls.Grid.SetColumn(IpHeaderRow, 0); System.Windows.Controls.Grid.SetRow(IpHeaderRow, 0);
-            System.Windows.Controls.Grid.SetColumn(IpBarsGrid, 1); System.Windows.Controls.Grid.SetRow(IpBarsGrid, 0);
-            IpBarsGrid.Margin = new Thickness(4, 0, 0, 0);
-            IpLabel.FontSize = 9;
+            // ADDR & DNS: reduce font and margin (text-only rows)
+            AddrLabel.FontSize = 9;
+            DnsLabel.FontSize = 9;
+            AddrValue.FontSize = 9;
+            DnsValue.FontSize = 9;
 
             // TEMP: label left, bars right (same as NET)
             TempSection.ColumnDefinitions.Clear();
@@ -233,7 +223,8 @@ public partial class MainWindow : Window
             GpuSection.Margin = new Thickness(0, 0, 0, 2);
             NetSection.Margin = new Thickness(0, 0, 0, 2);
             PingSection.Margin = new Thickness(0, 0, 0, 2);
-            IpSection.Margin = new Thickness(0, 0, 0, 2);
+            AddrSection.Margin = new Thickness(0, 0, 0, 2);
+            DnsSection.Margin = new Thickness(0, 0, 0, 2);
             ProcSection.Margin = new Thickness(0, 0, 0, 2);
             TempSection.Margin = new Thickness(0, 0, 0, 0);
         }
@@ -257,15 +248,11 @@ public partial class MainWindow : Window
             NetUpBarContainer.Height = 6; NetDnBarContainer.Height = 6;
             NetLabel.FontSize = 11;
 
-            // IP: restore
-            IpSection.ColumnDefinitions.Clear();
-            IpSection.RowDefinitions.Clear();
-            IpSection.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
-            IpSection.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
-            System.Windows.Controls.Grid.SetColumn(IpHeaderRow, 0); System.Windows.Controls.Grid.SetRow(IpHeaderRow, 0);
-            System.Windows.Controls.Grid.SetColumn(IpBarsGrid, 0); System.Windows.Controls.Grid.SetRow(IpBarsGrid, 1);
-            IpBarsGrid.Margin = new Thickness(0, 2, 0, 0);
-            IpLabel.FontSize = 11;
+            // ADDR & DNS: restore font and margin
+            AddrLabel.FontSize = 11;
+            DnsLabel.FontSize = 11;
+            AddrValue.FontSize = 11;
+            DnsValue.FontSize = 11;
 
             // TEMP: restore
             TempSection.ColumnDefinitions.Clear();
@@ -283,7 +270,8 @@ public partial class MainWindow : Window
             GpuSection.Margin = new Thickness(0, 0, 0, 7);
             NetSection.Margin = new Thickness(0, 0, 0, 7);
             PingSection.Margin = new Thickness(0, 0, 0, 7);
-            IpSection.Margin = new Thickness(0, 0, 0, 7);
+            AddrSection.Margin = new Thickness(0, 0, 0, 7);
+            DnsSection.Margin = new Thickness(0, 0, 0, 7);
             ProcSection.Margin = new Thickness(0, 0, 0, 7);
             TempSection.Margin = new Thickness(0, 0, 0, 0);
         }
@@ -761,9 +749,8 @@ public partial class MainWindow : Window
             }
         }
         catch { }
-        IpAddrValue.Text = localIp;
-        IpDnsValue.Text = dnsServer;
-        IpValue.Text = $"{localIp}";
+        AddrValue.Text = localIp;
+        DnsValue.Text = dnsServer;
 
         // PROC (process count)
         int procCount = 0;
