@@ -42,7 +42,6 @@ public partial class MainWindow : Window
 
     // Ping monitoring
     private readonly System.Net.NetworkInformation.Ping _pingSender = new();
-    private const string PingTarget = "223.5.5.5";  // Alibaba DNS
 
     // Pre-allocated colors & brushes (avoid GC per-tick)
     private static readonly SolidColorBrush CyanText = new(System.Windows.Media.Color.FromRgb(0x00, 0xFF, 0xF9));
@@ -108,6 +107,7 @@ public partial class MainWindow : Window
         UpdateLockButtonVisual();
         UpdateOpacityBarVisual();
         ApplyMonitorVisibility();
+        UpdatePingLabel();
 
         // Sync auto-start state from config to registry
         var autoStart = new AutoStartService();
@@ -155,33 +155,26 @@ public partial class MainWindow : Window
         if (!_isLocked) DragMove();
     }
 
-    // ── Settings entry (3 dots click) ──
+    // ── Settings entry (3 dots click — toggle open/close) ──
     private void Dots_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
         e.Handled = true;  // prevent drag
-        OpenSettings();
+        if (_settingsWindow != null && _settingsWindow.IsLoaded)
+            _settingsWindow.Close();
+        else
+            OpenSettings();
     }
 
     private void OpenSettings()
     {
-        if (_settingsWindow != null && _settingsWindow.IsLoaded)
-        {
-            _settingsWindow.Activate();
-            return;
-        }
-
-        _settingsWindow = new SettingsWindow(_config);
+        _settingsWindow = new SettingsWindow(_config, this);
         _settingsWindow.SettingsChanged += ApplyMonitorVisibility;
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
 
-        // Position to the right of main window, or left if no space
-        double settingsWidth = 280;
-        if (Left + Width + 8 + settingsWidth > SystemParameters.PrimaryScreenWidth)
-            _settingsWindow.Left = Left - settingsWidth - 8;
-        else
-            _settingsWindow.Left = Left + Width + 8;
-        _settingsWindow.Top = Top;
         _settingsWindow.Show();
+        _settingsWindow.SnapToOwner();
+        _settingsWindow.SyncBackgroundAlpha(_bgAlpha);
+        _settingsWindow.SyncTopmost(_isPinned);
     }
 
     // ── Monitor visibility ──
@@ -200,6 +193,9 @@ public partial class MainWindow : Window
         ProcSection.Visibility  = vis.GetValueOrDefault("PROC", true)   ? Visibility.Visible : Visibility.Collapsed;
         TempSection.Visibility  = vis.GetValueOrDefault("TEMP", true)   ? Visibility.Visible : Visibility.Collapsed;
 
+        // Update DELAY label to reflect current PingTarget
+        UpdatePingLabel();
+
         // Resize window to fit visible content
         SizeToContent = System.Windows.SizeToContent.Height;
         Dispatcher.BeginInvoke(() =>
@@ -208,6 +204,11 @@ public partial class MainWindow : Window
             SizeToContent = System.Windows.SizeToContent.Manual;
             Height = newHeight;
         }, DispatcherPriority.Loaded);
+    }
+
+    private void UpdatePingLabel()
+    {
+        PingLabel.Text = _isCompact ? "DELAY" : $"DELAY({_config.Data.PingTarget})";
     }
 
     // ── Compact mode ──
@@ -303,7 +304,7 @@ public partial class MainWindow : Window
             SetMetricGridNormal(RamSection, RamHeaderRow, RamBarContainer, RamLabel);
             SetMetricGridNormal(GpuSection, GpuHeaderRow, GpuBarContainer, GpuLabel);
             SetMetricGridNormal(PingSection, PingHeaderRow, PingBarContainer, PingLabel);
-            PingLabel.Text = "DELAY(223.5.5.5)";
+            PingLabel.Text = $"DELAY({_config.Data.PingTarget})";
             SetMetricGridNormal(WifiSection, WifiHeaderRow, WifiBarContainer, WifiLabel);
             SetMetricGridNormal(ProcSection, ProcHeaderRow, ProcBarContainer, ProcLabel);
 
@@ -422,6 +423,8 @@ public partial class MainWindow : Window
             var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
             SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
         }
+
+        _settingsWindow?.SyncTopmost(_isPinned);
     }
 
     private void UpdatePinButtonVisual()
@@ -487,6 +490,7 @@ public partial class MainWindow : Window
         if (RootBorder == null) return;
         byte a = (byte)Math.Round(alpha * 255);
         RootBorder.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(a, 0x0A, 0x0A, 0x14));
+        _settingsWindow?.SyncBackgroundAlpha(alpha);
     }
 
     private void UpdateOpacityBarVisual()
@@ -832,7 +836,7 @@ public partial class MainWindow : Window
         long pingMs = -1;
         try
         {
-            var reply = await _pingSender.SendPingAsync(PingTarget, 2000);
+            var reply = await _pingSender.SendPingAsync(_config.Data.PingTarget, 2000);
             if (reply.Status == IPStatus.Success)
                 pingMs = reply.RoundtripTime;
         }

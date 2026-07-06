@@ -58,6 +58,42 @@
             </Setter>
         </Style>
 
+        <!-- Cyberpunk textbox style -->
+        <Style TargetType="TextBox">
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="#00FFF9"/>
+            <Setter Property="Background" Value="#050510"/>
+            <Setter Property="BorderBrush" Value="#6600FFF9"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="CaretBrush" Value="#00FFF9"/>
+            <Setter Property="Cursor" Value="IBeam"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="1">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Padding="{TemplateBinding Padding}"
+                                          VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#00FFF9"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#00FFF9"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#0A1520"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Cyberpunk scrollbar (same as main window) -->
         <Style TargetType="ScrollBar">
             <Setter Property="OverridesDefaultStyle" Value="True"/>
@@ -97,7 +133,7 @@
         </Style>
     </Window.Resources>
 
-    <Border Background="#0A0A14" BorderBrush="#2600FFF9" BorderThickness="1" CornerRadius="0">
+    <Border x:Name="SettingsRootBorder" Background="#0A0A14" BorderBrush="#2600FFF9" BorderThickness="1" CornerRadius="0">
         <Grid>
             <!-- Corner brackets -->
             <Border Width="12" Height="12" HorizontalAlignment="Left" VerticalAlignment="Top"
@@ -124,27 +160,31 @@
                                    Foreground="#7F00FFF9" FontWeight="Bold" VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <!-- Lock/follow toggle -->
-                    <Button x:Name="FollowToggle" Click="FollowToggle_Click"
-                            Width="18" Height="18"
-                            FontFamily="Consolas" FontSize="10" FontWeight="Bold"
-                            Foreground="#B300FFF9" Background="Transparent"
-                            BorderBrush="#6600FFF9" BorderThickness="1"
-                            Content="L"
-                            VerticalAlignment="Center" VerticalContentAlignment="Center"
-                            HorizontalAlignment="Right" HorizontalContentAlignment="Center"
-                            Margin="0,0,3,0" Cursor="Hand"
-                            ToolTip="锁定跟随主窗口 / 解锁自由拖动"/>
-                    <Button x:Name="CloseButton" Click="CloseButton_Click"
-                             Width="16" Height="16"
-                             FontFamily="Consolas" FontSize="12" FontWeight="Bold"
-                             Foreground="#FF5555" Background="#18FF5555"
-                             BorderBrush="#80FF5555" BorderThickness="1"
-                             Content="&#x2715;"
-                             VerticalAlignment="Center" VerticalContentAlignment="Center"
-                             HorizontalAlignment="Right" HorizontalContentAlignment="Center"
-                             Margin="0,0,8,0" Cursor="Hand"
-                             Effect="{StaticResource RedGlow}"/>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                HorizontalAlignment="Right" Margin="0,0,8,0">
+                        <!-- Lock/follow toggle -->
+                        <Button x:Name="FollowToggle" Click="FollowToggle_Click"
+                                Width="18" Height="18" Margin="0,0,3,0"
+                                FontFamily="Consolas" FontSize="10" FontWeight="Bold"
+                                Foreground="#B300FFF9" Background="Transparent"
+                                BorderBrush="#6600FFF9" BorderThickness="1"
+                                Content="L"
+                                VerticalAlignment="Center" VerticalContentAlignment="Center"
+                                HorizontalContentAlignment="Center"
+                                Cursor="Hand"
+                                ToolTip="锁定跟随主窗口 / 解锁自由拖动"/>
+                        <!-- Close -->
+                        <Button x:Name="CloseButton" Click="CloseButton_Click"
+                                Width="16" Height="16"
+                                FontFamily="Consolas" FontSize="12" FontWeight="Bold"
+                                Foreground="#FF5555" Background="#18FF5555"
+                                BorderBrush="#80FF5555" BorderThickness="1"
+                                Content="&#x2715;"
+                                VerticalAlignment="Center" VerticalContentAlignment="Center"
+                                HorizontalContentAlignment="Center"
+                                Cursor="Hand"
+                                Effect="{StaticResource RedGlow}"/>
+                    </StackPanel>
                 </DockPanel>
 
                 <!-- Content -->
