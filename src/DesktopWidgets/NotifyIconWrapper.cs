@@ -1,7 +1,7 @@
 using System.Drawing;
 using System.Windows;
 
-namespace DesktopWidgets;
+namespace Pulse;
 
 /// <summary>
 /// System tray icon with context menu.
@@ -20,7 +20,7 @@ public class NotifyIconWrapper : IDisposable
         _notifyIcon = new System.Windows.Forms.NotifyIcon
         {
             Icon = CreateDefaultIcon(),
-            Text = "DesktopWidgets",
+            Text = "Pulse / 脉搏",
             Visible = true
         };
 

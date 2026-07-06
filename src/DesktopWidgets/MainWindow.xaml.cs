@@ -8,7 +8,7 @@ using System.Windows.Media.Animation;
 using System.Management;
 using LibreHardwareMonitor.Hardware;
 
-namespace DesktopWidgets;
+namespace Pulse;
 
 public partial class MainWindow : Window
 {

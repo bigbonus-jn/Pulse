@@ -1,6 +1,6 @@
 using Microsoft.Win32;
 
-namespace DesktopWidgets;
+namespace Pulse;
 
 /// <summary>
 /// Manages auto-start via HKCU\Software\Microsoft\Windows\CurrentVersion\Run.
@@ -8,7 +8,7 @@ namespace DesktopWidgets;
 public class AutoStartService
 {
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string AppName = "DesktopWidgets";
+    private const string AppName = "Pulse";
 
     private static readonly string ExePath = Environment.ProcessPath ?? "";
 

@@ -2,7 +2,7 @@
 using System.Data;
 using System.Windows;
 
-namespace DesktopWidgets;
+namespace Pulse;
 
 /// <summary>
 /// Interaction logic for App.xaml

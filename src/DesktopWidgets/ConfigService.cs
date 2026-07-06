@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text.Json;
 
-namespace DesktopWidgets;
+namespace Pulse;
 
 public class WidgetConfig
 {
@@ -20,7 +20,7 @@ public class ConfigService
 {
     private static readonly string ConfigPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "DesktopWidgets", "config.json");
+        "Pulse", "config.json");
 
     public WidgetConfig Data { get; private set; } = new();
 
