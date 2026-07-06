@@ -158,17 +158,30 @@
                            Background="Transparent" Height="28">
                     <Border DockPanel.Dock="Bottom" Height="1" Background="#1A00FFF9"/>
 
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
-                        <Ellipse Width="5" Height="5" Fill="#00FFF9" Margin="0,0,6,0"
-                                 Effect="{StaticResource CyanGlow}"/>
-                        <Ellipse Width="5" Height="5" Fill="#FF2A6D" Margin="0,0,6,0"
-                                 Effect="{StaticResource MagentaGlow}"/>
-                        <Ellipse Width="5" Height="5" Fill="#FFD700" Margin="0,0,6,0"
-                                 Effect="{StaticResource YellowGlow}"/>
-                        <TextBlock Text="PULSE" FontFamily="Consolas" FontSize="10"
-                                   Foreground="#7F00FFF9" FontWeight="Bold"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
+                    <Border x:Name="DotsButton" MouseLeftButtonDown="Dots_MouseLeftButtonDown"
+                            Background="Transparent" Cursor="Hand" ToolTip="设置"
+                            CornerRadius="2" Padding="6,2" Margin="4,0,0,0">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#1A00FFF9"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Ellipse Width="4" Height="4" Fill="#00FFF9" Margin="0,0,3,0"
+                                     Effect="{StaticResource CyanGlow}"/>
+                            <Ellipse Width="4" Height="4" Fill="#FF2A6D" Margin="0,0,3,0"
+                                     Effect="{StaticResource MagentaGlow}"/>
+                            <Ellipse Width="4" Height="4" Fill="#FFD700" Margin="0,0,3,0"
+                                     Effect="{StaticResource YellowGlow}"/>
+                            <TextBlock Text="PULSE" FontFamily="Consolas" FontSize="10"
+                                       Foreground="#7F00FFF9" FontWeight="Bold"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
 
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
                                 HorizontalAlignment="Right" Margin="0,0,10,0">

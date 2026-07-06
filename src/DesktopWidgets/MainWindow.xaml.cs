@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     private readonly PerformanceCounter _cpuCounter = new("Processor", "% Processor Time", "_Total");
     private readonly PerformanceCounter _memCounter = new("Memory", "Available MBytes");
     private readonly ConfigService _config = new();
+    private SettingsWindow? _settingsWindow;
     private bool _cpuFirstSample = true;
     private bool _isCompact;
     private bool _isPinned = true;  // topmost pin state
@@ -106,6 +107,7 @@ public partial class MainWindow : Window
         UpdatePinButtonVisual();
         UpdateLockButtonVisual();
         UpdateOpacityBarVisual();
+        ApplyMonitorVisibility();
 
         // Sync auto-start state from config to registry
         var autoStart = new AutoStartService();
@@ -140,6 +142,7 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        _settingsWindow?.Close();
         _config.Save();
         _dataTimer.Stop();
         _notifyIcon?.Dispose();
@@ -150,6 +153,61 @@ public partial class MainWindow : Window
     private void TopBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
         if (!_isLocked) DragMove();
+    }
+
+    // ── Settings entry (3 dots click) ──
+    private void Dots_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        e.Handled = true;  // prevent drag
+        OpenSettings();
+    }
+
+    private void OpenSettings()
+    {
+        if (_settingsWindow != null && _settingsWindow.IsLoaded)
+        {
+            _settingsWindow.Activate();
+            return;
+        }
+
+        _settingsWindow = new SettingsWindow(_config);
+        _settingsWindow.SettingsChanged += ApplyMonitorVisibility;
+        _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+
+        // Position to the right of main window, or left if no space
+        double settingsWidth = 280;
+        if (Left + Width + 8 + settingsWidth > SystemParameters.PrimaryScreenWidth)
+            _settingsWindow.Left = Left - settingsWidth - 8;
+        else
+            _settingsWindow.Left = Left + Width + 8;
+        _settingsWindow.Top = Top;
+        _settingsWindow.Show();
+    }
+
+    // ── Monitor visibility ──
+    private void ApplyMonitorVisibility()
+    {
+        var vis = _config.Data.MonitorVisibility;
+
+        CpuSection.Visibility   = vis.GetValueOrDefault("CPU", true)    ? Visibility.Visible : Visibility.Collapsed;
+        RamSection.Visibility   = vis.GetValueOrDefault("RAM", true)    ? Visibility.Visible : Visibility.Collapsed;
+        GpuSection.Visibility   = vis.GetValueOrDefault("GPU", true)    ? Visibility.Visible : Visibility.Collapsed;
+        NetSection.Visibility   = vis.GetValueOrDefault("NET", true)    ? Visibility.Visible : Visibility.Collapsed;
+        PingSection.Visibility  = vis.GetValueOrDefault("DELAY", true)  ? Visibility.Visible : Visibility.Collapsed;
+        WifiSection.Visibility  = vis.GetValueOrDefault("WIFI", true)   ? Visibility.Visible : Visibility.Collapsed;
+        AddrSection.Visibility  = vis.GetValueOrDefault("IPADDR", true) ? Visibility.Visible : Visibility.Collapsed;
+        DnsSection.Visibility   = vis.GetValueOrDefault("IPDNS", true)  ? Visibility.Visible : Visibility.Collapsed;
+        ProcSection.Visibility  = vis.GetValueOrDefault("PROC", true)   ? Visibility.Visible : Visibility.Collapsed;
+        TempSection.Visibility  = vis.GetValueOrDefault("TEMP", true)   ? Visibility.Visible : Visibility.Collapsed;
+
+        // Resize window to fit visible content
+        SizeToContent = System.Windows.SizeToContent.Height;
+        Dispatcher.BeginInvoke(() =>
+        {
+            var newHeight = ActualHeight;
+            SizeToContent = System.Windows.SizeToContent.Manual;
+            Height = newHeight;
+        }, DispatcherPriority.Loaded);
     }
 
     // ── Compact mode ──

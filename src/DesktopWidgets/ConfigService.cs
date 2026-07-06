@@ -14,6 +14,19 @@ public class WidgetConfig
     public bool AutoStart { get; set; } = false;
     public double Opacity { get; set; } = 1.0;  // 0.2 ~ 1.0
     public bool Locked { get; set; } = false;   // lock position
+    public Dictionary<string, bool> MonitorVisibility { get; set; } = new()
+    {
+        {"CPU", true},
+        {"RAM", true},
+        {"GPU", true},
+        {"NET", true},
+        {"DELAY", true},
+        {"WIFI", true},
+        {"IPADDR", true},
+        {"IPDNS", true},
+        {"PROC", true},
+        {"TEMP", true}
+    };
 }
 
 public class ConfigService
