@@ -295,6 +295,12 @@ public partial class MainWindow : Window
         ScanlineTransform.BeginAnimation(TranslateTransform.YProperty, anim);
     }
 
+    // ── Exit ──
+    private void ExitButton_Click(object sender, RoutedEventArgs e)
+    {
+        Close();
+    }
+
     // ── Pin / Topmost toggle ──
     private void PinToggle_Click(object sender, RoutedEventArgs e)
     {

@@ -190,12 +190,22 @@
                                  HorizontalAlignment="Right" Margin="0,0,0,0"
                                  Effect="{StaticResource CyanGlow}"/>
                     </Grid>
-                    <TextBlock x:Name="ClockLabel" Text="--:--:--"
-                               FontFamily="Consolas" FontSize="11"
-                               Foreground="#BF00FFF9"
-                               VerticalAlignment="Center"
-                               HorizontalAlignment="Right" Margin="0,0,10,0"
-                               Effect="{StaticResource CyanGlow}"/>
+                     <TextBlock x:Name="ClockLabel" Text="--:--:--"
+                                FontFamily="Consolas" FontSize="11"
+                                Foreground="#BF00FFF9"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Right" Margin="0,0,6,0"
+                                Effect="{StaticResource CyanGlow}"/>
+                     <!-- Exit button -->
+                     <Button x:Name="ExitButton" Click="ExitButton_Click"
+                             Width="14" Height="14"
+                             FontFamily="Consolas" FontSize="9"
+                             Foreground="#4FFFFFFF" Background="Transparent"
+                             BorderBrush="#30FFFFFF" BorderThickness="1"
+                             Content="x"
+                             VerticalAlignment="Center"
+                             HorizontalAlignment="Right" Margin="0,0,8,0"
+                             Cursor="Hand" ToolTip="退出"/>
                 </DockPanel>
 
                 <!-- Metrics content -->
