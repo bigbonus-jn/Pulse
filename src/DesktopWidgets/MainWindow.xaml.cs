@@ -73,10 +73,10 @@ public partial class MainWindow : Window
         _isPinned = _config.Data.Topmost;
         Topmost = _isPinned;
 
-        // Restore opacity
-        var opacity = Math.Clamp(_config.Data.Opacity, 0.2, 1.0);
-        Opacity = opacity;
-        OpacitySlider.Value = opacity * 100;
+        // Restore opacity (background alpha only, not window opacity)
+        var bgAlpha = Math.Clamp(_config.Data.Opacity, 0.2, 1.0);
+        OpacitySlider.Value = bgAlpha * 100;
+        ApplyBackgroundAlpha(bgAlpha);
 
         // Initialize LibreHardwareMonitor for CPU/GPU temperature
         _computer = new Computer { IsCpuEnabled = true, IsGpuEnabled = true, IsStorageEnabled = true };
@@ -317,14 +317,21 @@ public partial class MainWindow : Window
             : new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x60, 0x60, 0x60));
     }
 
-    // ── Opacity slider ──
+    // ── Opacity slider (background alpha only) ──
     private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (RootBorder == null) return;  // slider fires before InitializeComponent
-        var opacity = Math.Clamp(e.NewValue / 100.0, 0.2, 1.0);
-        Opacity = opacity;
-        _config.Data.Opacity = opacity;
+        var bgAlpha = Math.Clamp(e.NewValue / 100.0, 0.2, 1.0);
+        ApplyBackgroundAlpha(bgAlpha);
+        _config.Data.Opacity = bgAlpha;
         _config.Save();
+    }
+
+    private void ApplyBackgroundAlpha(double alpha)
+    {
+        // Base color: #0A0A14, adjust only the alpha channel
+        byte a = (byte)Math.Round(alpha * 255);
+        RootBorder.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(a, 0x0A, 0x0A, 0x14));
     }
 
     // ── Click-through ──

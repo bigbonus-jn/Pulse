@@ -4,7 +4,7 @@
         Title="DesktopWidgets"
         Width="260" Height="480"
         WindowStyle="None"
-        Background="#0A0A14"
+        Background="Transparent"
         Topmost="True"
         ShowInTaskbar="False"
         ResizeMode="NoResize"
