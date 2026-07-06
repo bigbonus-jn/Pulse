@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Threading;
@@ -35,6 +36,10 @@ public partial class MainWindow : Window
     private double _gpuVramMB;
     private List<PerformanceCounter> _gpuCounters = new();
     private bool _gpuCountersInitialized;
+
+    // Ping monitoring
+    private readonly System.Net.NetworkInformation.Ping _pingSender = new();
+    private const string PingTarget = "223.5.5.5";  // Alibaba DNS
 
     // Pre-allocated colors & brushes (avoid GC per-tick)
     private static readonly SolidColorBrush CyanText = new(System.Windows.Media.Color.FromRgb(0x00, 0xFF, 0xF9));
@@ -163,6 +168,8 @@ public partial class MainWindow : Window
         RamValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         GpuValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         NetValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+        PingValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+        IpValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         TempValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         ProcValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
 
@@ -174,12 +181,19 @@ public partial class MainWindow : Window
         TempCpuTag.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         TempGpuTag.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
 
+        // IP tags
+        IpAddrTag.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+        IpDnsTag.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+        IpAddrValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+        IpDnsValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+
         if (_isCompact)
         {
             // Compact: switch each Grid to 2-column layout [label | bar]
             SetMetricGridCompact(CpuSection, CpuHeaderRow, CpuBarContainer, CpuLabel);
             SetMetricGridCompact(RamSection, RamHeaderRow, RamBarContainer, RamLabel);
             SetMetricGridCompact(GpuSection, GpuHeaderRow, GpuBarContainer, GpuLabel);
+            SetMetricGridCompact(PingSection, PingHeaderRow, PingBarContainer, PingLabel);
             SetMetricGridCompact(ProcSection, ProcHeaderRow, ProcBarContainer, ProcLabel);
 
             // NET: label left, bars right
@@ -192,6 +206,16 @@ public partial class MainWindow : Window
             NetBarsGrid.Margin = new Thickness(4, 1, 0, 0);
             NetUpBarContainer.Height = 5; NetDnBarContainer.Height = 5;
             NetLabel.FontSize = 9;
+
+            // IP: label left, info right (same as NET)
+            IpSection.ColumnDefinitions.Clear();
+            IpSection.RowDefinitions.Clear();
+            IpSection.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(22) });
+            IpSection.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            System.Windows.Controls.Grid.SetColumn(IpHeaderRow, 0); System.Windows.Controls.Grid.SetRow(IpHeaderRow, 0);
+            System.Windows.Controls.Grid.SetColumn(IpBarsGrid, 1); System.Windows.Controls.Grid.SetRow(IpBarsGrid, 0);
+            IpBarsGrid.Margin = new Thickness(4, 0, 0, 0);
+            IpLabel.FontSize = 9;
 
             // TEMP: label left, bars right (same as NET)
             TempSection.ColumnDefinitions.Clear();
@@ -208,6 +232,8 @@ public partial class MainWindow : Window
             RamSection.Margin = new Thickness(0, 0, 0, 2);
             GpuSection.Margin = new Thickness(0, 0, 0, 2);
             NetSection.Margin = new Thickness(0, 0, 0, 2);
+            PingSection.Margin = new Thickness(0, 0, 0, 2);
+            IpSection.Margin = new Thickness(0, 0, 0, 2);
             ProcSection.Margin = new Thickness(0, 0, 0, 2);
             TempSection.Margin = new Thickness(0, 0, 0, 0);
         }
@@ -217,6 +243,7 @@ public partial class MainWindow : Window
             SetMetricGridNormal(CpuSection, CpuHeaderRow, CpuBarContainer, CpuLabel);
             SetMetricGridNormal(RamSection, RamHeaderRow, RamBarContainer, RamLabel);
             SetMetricGridNormal(GpuSection, GpuHeaderRow, GpuBarContainer, GpuLabel);
+            SetMetricGridNormal(PingSection, PingHeaderRow, PingBarContainer, PingLabel);
             SetMetricGridNormal(ProcSection, ProcHeaderRow, ProcBarContainer, ProcLabel);
 
             // NET: restore
@@ -229,6 +256,16 @@ public partial class MainWindow : Window
             NetBarsGrid.Margin = new Thickness(0, 3, 0, 0);
             NetUpBarContainer.Height = 6; NetDnBarContainer.Height = 6;
             NetLabel.FontSize = 11;
+
+            // IP: restore
+            IpSection.ColumnDefinitions.Clear();
+            IpSection.RowDefinitions.Clear();
+            IpSection.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+            IpSection.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+            System.Windows.Controls.Grid.SetColumn(IpHeaderRow, 0); System.Windows.Controls.Grid.SetRow(IpHeaderRow, 0);
+            System.Windows.Controls.Grid.SetColumn(IpBarsGrid, 0); System.Windows.Controls.Grid.SetRow(IpBarsGrid, 1);
+            IpBarsGrid.Margin = new Thickness(0, 2, 0, 0);
+            IpLabel.FontSize = 11;
 
             // TEMP: restore
             TempSection.ColumnDefinitions.Clear();
@@ -245,6 +282,8 @@ public partial class MainWindow : Window
             RamSection.Margin = new Thickness(0, 0, 0, 7);
             GpuSection.Margin = new Thickness(0, 0, 0, 7);
             NetSection.Margin = new Thickness(0, 0, 0, 7);
+            PingSection.Margin = new Thickness(0, 0, 0, 7);
+            IpSection.Margin = new Thickness(0, 0, 0, 7);
             ProcSection.Margin = new Thickness(0, 0, 0, 7);
             TempSection.Margin = new Thickness(0, 0, 0, 0);
         }
@@ -660,6 +699,71 @@ public partial class MainWindow : Window
                 : "未检测到独立 GPU";
         }
         if (gpuTempAvailable) TempGpuTag.Foreground = FindResource("YellowBar") as System.Windows.Media.Brush;
+
+        // PING (latency to Alibaba DNS 223.5.5.5)
+        long pingMs = -1;
+        try
+        {
+            var reply = _pingSender.Send(PingTarget, 2000);
+            if (reply.Status == IPStatus.Success)
+                pingMs = reply.RoundtripTime;
+        }
+        catch { }
+        if (pingMs >= 0)
+        {
+            PingValue.Text = $"{pingMs}ms";
+            PingFill.Width = Math.Min(1, pingMs / 200.0) * PingBarContainer.ActualWidth;
+            if (pingMs > 100)
+            {
+                PingFill.Fill = FindResource("RedBar") as System.Windows.Media.Brush;
+                PingValue.Foreground = RedText;
+            }
+            else if (pingMs > 50)
+            {
+                PingFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
+                PingValue.Foreground = YellowText;
+            }
+            else
+            {
+                PingFill.Fill = FindResource("GreenBar") as System.Windows.Media.Brush;
+                PingValue.Foreground = FindResource("GreenBar") as System.Windows.Media.Brush;
+            }
+        }
+        else
+        {
+            PingValue.Text = "N/A";
+            PingValue.Foreground = DimText;
+            PingFill.Width = 0;
+        }
+
+        // IP / DNS
+        string localIp = "N/A";
+        string dnsServer = "N/A";
+        try
+        {
+            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (ni.OperationalStatus != OperationalStatus.Up) continue;
+                if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+
+                var ipProps = ni.GetIPProperties();
+                var unicast = ipProps.UnicastAddresses
+                    .FirstOrDefault(a => a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
+                                      && !a.Address.ToString().StartsWith("169."));
+                if (unicast != null)
+                {
+                    localIp = unicast.Address.ToString();
+                    var dns = ipProps.DnsAddresses
+                        .FirstOrDefault(d => d.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                    if (dns != null) dnsServer = dns.ToString();
+                    break;
+                }
+            }
+        }
+        catch { }
+        IpAddrValue.Text = localIp;
+        IpDnsValue.Text = dnsServer;
+        IpValue.Text = $"{localIp}";
 
         // PROC (process count)
         int procCount = 0;

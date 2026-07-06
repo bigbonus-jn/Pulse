@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="DesktopWidgets"
-        Width="260" Height="480"
+        Width="260" Height="530"
         WindowStyle="None"
         Background="Transparent"
         Topmost="True"
@@ -357,9 +357,79 @@
                                  </Grid>
                              </StackPanel>
                          </Grid>
+                      </Grid>
+
+                     <!-- PING (latency to 223.5.5.5) -->
+                     <Grid x:Name="PingSection" Margin="0,0,0,7">
+                         <Grid.RowDefinitions>
+                             <RowDefinition Height="Auto"/>
+                             <RowDefinition Height="Auto"/>
+                         </Grid.RowDefinitions>
+                         <DockPanel x:Name="PingHeaderRow" Grid.Row="0">
+                              <TextBlock x:Name="PingLabel" Text="PING" FontFamily="Consolas"
+                                         FontSize="11" FontWeight="Bold" Foreground="#39FF14"
+                                         Effect="{StaticResource CyanGlow}"/>
+                              <TextBlock x:Name="PingValue" Text="N/A" FontFamily="Consolas"
+                                         FontSize="13" Foreground="#39FF14"
+                                         HorizontalAlignment="Right"
+                                         Effect="{StaticResource CyanGlow}"/>
+                         </DockPanel>
+                         <Grid x:Name="PingBarContainer" Grid.Row="1" Height="8" Margin="0,3,0,0">
+                             <Border Background="{StaticResource BarTrack}"/>
+                             <Rectangle x:Name="PingFill" HorizontalAlignment="Left" Width="0"
+                                        Fill="{StaticResource GreenBar}"/>
+                             <UniformGrid Rows="1" IsHitTestVisible="False">
+                                 <Border Style="{StaticResource BarTick}"/>
+                                 <Border Style="{StaticResource BarTick}"/>
+                                 <Border Style="{StaticResource BarTick}"/>
+                                 <Border Style="{StaticResource BarTick}"/>
+                                 <Border Style="{StaticResource BarTick}"/>
+                                 <Border Style="{StaticResource BarTick}"/>
+                                 <Border Style="{StaticResource BarTick}"/>
+                                 <Border Style="{StaticResource BarTick}"/>
+                                 <Border Style="{StaticResource BarTick}"/>
+                                 <Border/>
+                             </UniformGrid>
+                         </Grid>
                      </Grid>
 
-                     <!-- PROC -->
+                     <!-- IP / DNS (dual-column like NET) -->
+                     <Grid x:Name="IpSection" Margin="0,0,0,7">
+                         <Grid.RowDefinitions>
+                             <RowDefinition Height="Auto"/>
+                             <RowDefinition Height="Auto"/>
+                         </Grid.RowDefinitions>
+                         <DockPanel x:Name="IpHeaderRow" Grid.Row="0">
+                              <TextBlock x:Name="IpLabel" Text="IP" FontFamily="Consolas"
+                                         FontSize="11" FontWeight="Bold" Foreground="#BD93F9"
+                                         Effect="{StaticResource PurpleGlow}"/>
+                              <TextBlock x:Name="IpValue" Text="N/A" FontFamily="Consolas"
+                                         FontSize="11" Foreground="#BD93F9"
+                                         HorizontalAlignment="Right"
+                                         Effect="{StaticResource PurpleGlow}"/>
+                         </DockPanel>
+                         <Grid Grid.Row="1" Margin="0,2,0,0" x:Name="IpBarsGrid">
+                             <Grid.ColumnDefinitions>
+                                 <ColumnDefinition Width="*"/>
+                                 <ColumnDefinition Width="6"/>
+                                 <ColumnDefinition Width="*"/>
+                             </Grid.ColumnDefinitions>
+                             <StackPanel Grid.Column="0">
+                                 <TextBlock x:Name="IpAddrTag" Text="ADDR" FontFamily="Consolas"
+                                            FontSize="9" Foreground="#B3BD93F9" Margin="0,0,0,1"/>
+                                 <TextBlock x:Name="IpAddrValue" Text="N/A" FontFamily="Consolas"
+                                            FontSize="9" Foreground="#80BD93F9"/>
+                             </StackPanel>
+                             <StackPanel Grid.Column="2">
+                                 <TextBlock x:Name="IpDnsTag" Text="DNS" FontFamily="Consolas"
+                                            FontSize="9" Foreground="#B3BD93F9" Margin="0,0,0,1"/>
+                                 <TextBlock x:Name="IpDnsValue" Text="N/A" FontFamily="Consolas"
+                                            FontSize="9" Foreground="#80BD93F9"/>
+                             </StackPanel>
+                         </Grid>
+                     </Grid>
+
+                      <!-- PROC -->
                      <Grid x:Name="ProcSection" Margin="0,0,0,7">
                          <Grid.RowDefinitions>
                              <RowDefinition Height="Auto"/>
