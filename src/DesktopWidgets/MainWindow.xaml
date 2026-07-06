@@ -170,21 +170,22 @@
                                Foreground="#26FFFFFF"
                                VerticalAlignment="Center" Margin="10,0,0,0"/>
                     <!-- Opacity bar (cyberpunk style) -->
-                    <Grid x:Name="OpacityBar" Width="60" Height="10"
+                    <Grid x:Name="OpacityBar" Width="60" Height="14"
                           VerticalAlignment="Center" HorizontalAlignment="Right"
                           Margin="0,0,6,0" Cursor="Hand" ToolTip="背景透明度"
+                          Background="#08000000"
                           MouseLeftButtonDown="OpacityBar_MouseDown"
                           MouseMove="OpacityBar_MouseMove"
                           MouseLeftButtonUp="OpacityBar_MouseUp">
                         <!-- Track -->
-                        <Rectangle Height="3" RadiusX="1" RadiusY="1"
+                        <Rectangle Height="4" RadiusX="2" RadiusY="2"
                                    Fill="#15FFFFFF" VerticalAlignment="Center"/>
                         <!-- Fill indicator -->
-                        <Rectangle x:Name="OpacityFill" Height="3" RadiusX="1" RadiusY="1"
+                        <Rectangle x:Name="OpacityFill" Height="4" RadiusX="2" RadiusY="2"
                                    Fill="#00FFF9" Opacity="0.7" VerticalAlignment="Center"
                                    HorizontalAlignment="Left" Width="60"/>
                         <!-- Thumb dot -->
-                        <Ellipse x:Name="OpacityThumb" Width="6" Height="6"
+                        <Ellipse x:Name="OpacityThumb" Width="8" Height="8"
                                  Fill="#00FFF9" VerticalAlignment="Center"
                                  HorizontalAlignment="Right" Margin="0,0,0,0"
                                  Effect="{StaticResource CyanGlow}"/>
