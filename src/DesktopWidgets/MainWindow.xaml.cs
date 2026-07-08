@@ -24,8 +24,17 @@ public partial class MainWindow : Window
     private bool _isLocked;        // lock position (prevent drag)
     private bool _isDraggingOpacity;  // opacity bar drag state
     private double _bgAlpha = 1.0;  // background alpha 0.2~1.0
+    private System.Windows.Threading.DispatcherTimer? _resizeTimer;  // debounced resize
     private int _slowTickCounter;  // counts 1s ticks for 5s slow metrics
     private int _ipTickCounter;    // counts 1s ticks for 30s IP/DNS refresh
+    private int _wifiTickCounter;  // counts 1s ticks for WiFi refresh (WMI=5s, netsh=30s)
+
+    // Battery
+    private bool _hasBattery;  // true if system has a battery (laptop)
+
+    // WiFi signal: WMI vs netsh
+    private bool _wifiWmiAvailable;  // true if WMI MSNdis_80211 works
+    private bool _wifiWmiTested;     // true if we've tested WMI at least once
 
     // Network monitoring
     private PerformanceCounter? _netSentCounter;
@@ -103,6 +112,7 @@ public partial class MainWindow : Window
         _dataTimer.Start();
         InitializeNetworkCounters();
         InitializeGpuCounters();
+        DetectBattery();
         UpdatePinButtonVisual();
         UpdateLockButtonVisual();
         UpdateOpacityBarVisual();
@@ -192,23 +202,48 @@ public partial class MainWindow : Window
         DnsSection.Visibility   = vis.GetValueOrDefault("IPDNS", true)  ? Visibility.Visible : Visibility.Collapsed;
         ProcSection.Visibility  = vis.GetValueOrDefault("PROC", true)   ? Visibility.Visible : Visibility.Collapsed;
         TempSection.Visibility  = vis.GetValueOrDefault("TEMP", true)   ? Visibility.Visible : Visibility.Collapsed;
+        BatSection.Visibility   = (_hasBattery && vis.GetValueOrDefault("BAT", true)) ? Visibility.Visible : Visibility.Collapsed;
 
         // Update DELAY label to reflect current PingTarget
         UpdatePingLabel();
 
         // Resize window to fit visible content
-        SizeToContent = System.Windows.SizeToContent.Height;
-        Dispatcher.BeginInvoke(() =>
-        {
-            var newHeight = ActualHeight;
-            SizeToContent = System.Windows.SizeToContent.Manual;
-            Height = newHeight;
-        }, DispatcherPriority.Loaded);
+        ScheduleResize();
     }
 
     private void UpdatePingLabel()
     {
         PingLabel.Text = _isCompact ? "DELAY" : $"DELAY({_config.Data.PingTarget})";
+    }
+
+    // ── Debounced window resize ──
+    private void ScheduleResize()
+    {
+        _resizeTimer?.Stop();
+        _resizeTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(100),
+            IsEnabled = false
+        };
+        _resizeTimer.Tick += (_, _) =>
+        {
+            _resizeTimer!.Stop();
+            ExecuteResize();
+        };
+        _resizeTimer.Start();
+    }
+
+    private void ExecuteResize()
+    {
+        // Let WPF auto-size to content height
+        SizeToContent = System.Windows.SizeToContent.Height;
+        // Force synchronous layout pass
+        UpdateLayout();
+        // Capture the auto-sized height
+        var finalHeight = ActualHeight;
+        // Switch back to manual and lock the height
+        SizeToContent = System.Windows.SizeToContent.Manual;
+        Height = finalHeight;
     }
 
     // ── Compact mode ──
@@ -238,6 +273,7 @@ public partial class MainWindow : Window
         // ADDR & DNS: always show values (text-only, no bar)
         TempValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
         ProcValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
+        BatValue.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
 
         // NET tags
         NetUpTag.Visibility = _isCompact ? Visibility.Collapsed : Visibility.Visible;
@@ -256,6 +292,7 @@ public partial class MainWindow : Window
             SetMetricGridCompact(PingSection, PingHeaderRow, PingBarContainer, PingLabel);
             PingLabel.Text = "DELAY";
             SetMetricGridCompact(WifiSection, WifiHeaderRow, WifiBarContainer, WifiLabel);
+            SetMetricGridCompact(BatSection, BatHeaderRow, BatBarContainer, BatLabel);
             SetMetricGridCompact(ProcSection, ProcHeaderRow, ProcBarContainer, ProcLabel);
 
             // NET: label left, bars right
@@ -292,6 +329,7 @@ public partial class MainWindow : Window
             NetSection.Margin = new Thickness(0, 0, 0, 2);
             PingSection.Margin = new Thickness(0, 0, 0, 2);
             WifiSection.Margin = new Thickness(0, 0, 0, 2);
+            BatSection.Margin = new Thickness(0, 0, 0, 2);
             AddrSection.Margin = new Thickness(0, 0, 0, 2);
             DnsSection.Margin = new Thickness(0, 0, 0, 2);
             ProcSection.Margin = new Thickness(0, 0, 0, 2);
@@ -306,6 +344,7 @@ public partial class MainWindow : Window
             SetMetricGridNormal(PingSection, PingHeaderRow, PingBarContainer, PingLabel);
             PingLabel.Text = $"DELAY({_config.Data.PingTarget})";
             SetMetricGridNormal(WifiSection, WifiHeaderRow, WifiBarContainer, WifiLabel);
+            SetMetricGridNormal(BatSection, BatHeaderRow, BatBarContainer, BatLabel);
             SetMetricGridNormal(ProcSection, ProcHeaderRow, ProcBarContainer, ProcLabel);
 
             // NET: restore
@@ -342,6 +381,7 @@ public partial class MainWindow : Window
             NetSection.Margin = new Thickness(0, 0, 0, 7);
             PingSection.Margin = new Thickness(0, 0, 0, 7);
             WifiSection.Margin = new Thickness(0, 0, 0, 7);
+            BatSection.Margin = new Thickness(0, 0, 0, 7);
             AddrSection.Margin = new Thickness(0, 0, 0, 7);
             DnsSection.Margin = new Thickness(0, 0, 0, 7);
             ProcSection.Margin = new Thickness(0, 0, 0, 7);
@@ -349,13 +389,7 @@ public partial class MainWindow : Window
         }
 
         // Resize window to fit content after compact/normal switch
-        SizeToContent = System.Windows.SizeToContent.Height;
-        Dispatcher.BeginInvoke(() =>
-        {
-            var newHeight = ActualHeight;
-            SizeToContent = System.Windows.SizeToContent.Manual;
-            Height = newHeight;
-        }, DispatcherPriority.Loaded);
+        ScheduleResize();
     }
 
     private void SetMetricGridCompact(System.Windows.Controls.Grid section, System.Windows.Controls.DockPanel header, System.Windows.Controls.Grid bar, System.Windows.Controls.TextBlock label)
@@ -823,8 +857,17 @@ public partial class MainWindow : Window
         ProcValue.Foreground = TealText;
         ProcFill.Width = Math.Min(1, procCount / 300.0) * ProcBarContainer.ActualWidth;
 
-        // WIFI (signal strength via WMI)
-        UpdateWifiSignal();
+        // WIFI (signal strength) — WMI every 5s, netsh every 30s (avoids location service flash)
+        _wifiTickCounter++;
+        int wifiInterval = _wifiWmiAvailable ? 5 : 30;  // WMI: 5s, netsh fallback: 30s
+        if (_wifiTickCounter >= wifiInterval)
+        {
+            _wifiTickCounter = 0;
+            UpdateWifiSignal();
+        }
+
+        // BAT (battery level)
+        UpdateBattery();
     }
 
     private bool _pingInProgress;  // prevent overlapping async pings
@@ -968,7 +1011,58 @@ public partial class MainWindow : Window
 
     private void UpdateWifiSignal()
     {
+        // Strategy: Try WMI first (doesn't trigger location service).
+        // If WMI works, use it as primary (refreshed every 5s).
+        // If WMI fails, fall back to netsh (refreshed every 30s to avoid location icon flash).
+        if (!_wifiWmiTested || _wifiWmiAvailable)
+        {
+            if (TryUpdateWifiViaWmi())
+            {
+                _wifiWmiAvailable = true;
+                _wifiWmiTested = true;
+                return;
+            }
+            // WMI failed — mark as unavailable, fall through to netsh
+            _wifiWmiAvailable = false;
+            _wifiWmiTested = true;
+        }
+
+        // Fallback: netsh wlan show interfaces
+        UpdateWifiViaNetsh();
+    }
+
+    private bool TryUpdateWifiViaWmi()
+    {
+        try
+        {
+            // Method 1: MSNdis_80211_ReceivedSignalStrength (signal in dBm)
+            using var searcher = new ManagementObjectSearcher(
+                "root\\wmi",
+                "SELECT Ndis80211ReceivedSignalStrength FROM MSNdis_80211_ReceivedSignalStrength");
+            foreach (ManagementObject obj in searcher.Get())
+            {
+                var signal = obj["Ndis80211ReceivedSignalStrength"];
+                if (signal != null)
+                {
+                    int dbm = Convert.ToInt32(signal);
+                    // Typical range: -100 to -30 dBm
+                    if (dbm >= -100 && dbm <= 0)
+                    {
+                        ApplyWifiSignalDbm(dbm);
+                        return true;
+                    }
+                }
+            }
+        }
+        catch { }
+
+        return false;
+    }
+
+    private void UpdateWifiViaNetsh()
+    {
         // Use netsh wlan show interfaces — most reliable across Windows versions
+        // BUT triggers Windows location service (system tray icon flash)
         try
         {
             var psi = new ProcessStartInfo("netsh", "wlan show interfaces")
@@ -996,25 +1090,7 @@ public partial class MainWindow : Window
             {
                 int percent = int.Parse(match.Groups[1].Value);
                 int dbm = (percent / 2) - 100;  // Windows formula: percent = 2*(dBm+100)
-                WifiValue.Text = $"{dbm}dBm";
-                if (WifiBarContainer.ActualWidth > 0)
-                    WifiFill.Width = (percent / 100.0) * WifiBarContainer.ActualWidth;
-
-                if (percent < 25)
-                {
-                    WifiFill.Fill = FindResource("RedBar") as System.Windows.Media.Brush;
-                    WifiValue.Foreground = RedText;
-                }
-                else if (percent < 50)
-                {
-                    WifiFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
-                    WifiValue.Foreground = YellowText;
-                }
-                else
-                {
-                    WifiFill.Fill = FindResource("GreenBar") as System.Windows.Media.Brush;
-                    WifiValue.Foreground = FindResource("GreenBar") as System.Windows.Media.Brush;
-                }
+                ApplyWifiSignalDbm(dbm);
             }
             else
             {
@@ -1024,11 +1100,89 @@ public partial class MainWindow : Window
         catch { SetWifiNA(); }
     }
 
+    private void ApplyWifiSignalDbm(int dbm)
+    {
+        // Convert dBm back to percentage for bar fill: percent = 2*(dBm+100)
+        int percent = Math.Clamp(2 * (dbm + 100), 0, 100);
+        WifiValue.Text = $"{dbm}dBm";
+        if (WifiBarContainer.ActualWidth > 0)
+            WifiFill.Width = (percent / 100.0) * WifiBarContainer.ActualWidth;
+
+        // Color: <25%=red, <50%=yellow, >=50%=cyan
+        if (percent < 25)
+        {
+            WifiFill.Fill = FindResource("RedBar") as System.Windows.Media.Brush;
+            WifiValue.Foreground = RedText;
+        }
+        else if (percent < 50)
+        {
+            WifiFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
+            WifiValue.Foreground = YellowText;
+        }
+        else
+        {
+            WifiFill.Fill = FindResource("CyanBar") as System.Windows.Media.Brush;
+            WifiValue.Foreground = CyanText;
+        }
+    }
+
     private void SetWifiNA()
     {
         WifiValue.Text = "N/A";
         WifiValue.Foreground = DimText;
         WifiFill.Width = 0;
+    }
+
+    // ── Battery ──
+    private void DetectBattery()
+    {
+        try
+        {
+            var status = System.Windows.Forms.SystemInformation.PowerStatus;
+            _hasBattery = status.BatteryChargeStatus != System.Windows.Forms.BatteryChargeStatus.NoSystemBattery;
+        }
+        catch { _hasBattery = false; }
+
+        // No battery (desktop) → always hide, ignore user visibility setting
+        if (!_hasBattery)
+            BatSection.Visibility = Visibility.Collapsed;
+    }
+
+    private void UpdateBattery()
+    {
+        if (!_hasBattery) return;
+
+        try
+        {
+            var status = System.Windows.Forms.SystemInformation.PowerStatus;
+            double percent = Math.Round(status.BatteryLifePercent * 100, 0);
+            bool charging = (status.BatteryChargeStatus & System.Windows.Forms.BatteryChargeStatus.Charging) != 0;
+
+            // Value text: "86%" or "86% ⚡"
+            BatValue.Text = charging ? $"{percent:F0}% ⚡" : $"{percent:F0}%";
+
+            // Bar fill
+            if (BatBarContainer.ActualWidth > 0)
+                BatFill.Width = (percent / 100.0) * BatBarContainer.ActualWidth;
+
+            // Color by level: green=full, yellow=medium, red=low
+            if (percent < 20)
+            {
+                BatFill.Fill = FindResource("RedBar") as System.Windows.Media.Brush;
+                BatValue.Foreground = RedText;
+            }
+            else if (percent < 50)
+            {
+                BatFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
+                BatValue.Foreground = YellowText;
+            }
+            else
+            {
+                BatFill.Fill = FindResource("GreenBar") as System.Windows.Media.Brush;
+                BatValue.Foreground = FindResource("GreenBar") as System.Windows.Media.Brush;
+            }
+        }
+        catch { }
     }
 
     private static string FmtSpeed(double kbps)

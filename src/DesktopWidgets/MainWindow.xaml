@@ -525,41 +525,75 @@
                          </Grid>
                      </Grid>
 
-                     <!-- WIFI (signal strength) -->
-                     <Grid x:Name="WifiSection" Margin="0,0,0,7">
-                         <Grid.RowDefinitions>
-                             <RowDefinition Height="Auto"/>
-                             <RowDefinition Height="Auto"/>
-                         </Grid.RowDefinitions>
-                         <DockPanel x:Name="WifiHeaderRow" Grid.Row="0">
-                              <TextBlock x:Name="WifiLabel" Text="WIFI" FontFamily="Consolas"
-                                         FontSize="11" FontWeight="Bold" Foreground="#39FF14"
-                                         Effect="{StaticResource CyanGlow}"/>
-                              <TextBlock x:Name="WifiValue" Text="N/A" FontFamily="Consolas"
-                                         FontSize="13" Foreground="#39FF14"
-                                         HorizontalAlignment="Right"
-                                         Effect="{StaticResource CyanGlow}"/>
-                         </DockPanel>
-                         <Grid x:Name="WifiBarContainer" Grid.Row="1" Height="8" Margin="0,3,0,0">
-                             <Border Background="{StaticResource BarTrack}"/>
-                             <Rectangle x:Name="WifiFill" HorizontalAlignment="Left" Width="0"
-                                        Fill="{StaticResource GreenBar}"/>
-                             <UniformGrid Rows="1" IsHitTestVisible="False">
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border Style="{StaticResource BarTick}"/>
-                                 <Border/>
-                             </UniformGrid>
-                         </Grid>
-                     </Grid>
+                      <!-- WIFI (signal strength) -->
+                      <Grid x:Name="WifiSection" Margin="0,0,0,7">
+                          <Grid.RowDefinitions>
+                              <RowDefinition Height="Auto"/>
+                              <RowDefinition Height="Auto"/>
+                          </Grid.RowDefinitions>
+                          <DockPanel x:Name="WifiHeaderRow" Grid.Row="0">
+                               <TextBlock x:Name="WifiLabel" Text="WIFI" FontFamily="Consolas"
+                                          FontSize="11" FontWeight="Bold" Foreground="#00FFF9"
+                                          Effect="{StaticResource CyanGlow}"/>
+                               <TextBlock x:Name="WifiValue" Text="N/A" FontFamily="Consolas"
+                                          FontSize="13" Foreground="#00FFF9"
+                                          HorizontalAlignment="Right"
+                                          Effect="{StaticResource CyanGlow}"/>
+                          </DockPanel>
+                          <Grid x:Name="WifiBarContainer" Grid.Row="1" Height="8" Margin="0,3,0,0">
+                              <Border Background="{StaticResource BarTrack}"/>
+                              <Rectangle x:Name="WifiFill" HorizontalAlignment="Left" Width="0"
+                                         Fill="{StaticResource CyanBar}"/>
+                              <UniformGrid Rows="1" IsHitTestVisible="False">
+                                  <Border Style="{StaticResource BarTick}"/>
+                                  <Border Style="{StaticResource BarTick}"/>
+                                  <Border Style="{StaticResource BarTick}"/>
+                                  <Border Style="{StaticResource BarTick}"/>
+                                  <Border Style="{StaticResource BarTick}"/>
+                                  <Border Style="{StaticResource BarTick}"/>
+                                  <Border Style="{StaticResource BarTick}"/>
+                                  <Border Style="{StaticResource BarTick}"/>
+                                  <Border Style="{StaticResource BarTick}"/>
+                                  <Border/>
+                              </UniformGrid>
+                          </Grid>
+                      </Grid>
 
-                      <!-- TEMP (CPU / GPU dual temperature, like NET UP/DN layout) - last -->
+                       <!-- BAT (battery) -->
+                       <Grid x:Name="BatSection" Margin="0,0,0,7">
+                           <Grid.RowDefinitions>
+                               <RowDefinition Height="Auto"/>
+                               <RowDefinition Height="Auto"/>
+                           </Grid.RowDefinitions>
+                           <DockPanel x:Name="BatHeaderRow" Grid.Row="0">
+                                <TextBlock x:Name="BatLabel" Text="BAT" FontFamily="Consolas"
+                                           FontSize="11" FontWeight="Bold" Foreground="#39FF14"
+                                           Effect="{StaticResource CyanGlow}"/>
+                                <TextBlock x:Name="BatValue" Text="N/A" FontFamily="Consolas"
+                                           FontSize="13" Foreground="#39FF14"
+                                           HorizontalAlignment="Right"
+                                           Effect="{StaticResource CyanGlow}"/>
+                           </DockPanel>
+                           <Grid x:Name="BatBarContainer" Grid.Row="1" Height="8" Margin="0,3,0,0">
+                               <Border Background="{StaticResource BarTrack}"/>
+                               <Rectangle x:Name="BatFill" HorizontalAlignment="Left" Width="0"
+                                          Fill="{StaticResource GreenBar}"/>
+                               <UniformGrid Rows="1" IsHitTestVisible="False">
+                                   <Border Style="{StaticResource BarTick}"/>
+                                   <Border Style="{StaticResource BarTick}"/>
+                                   <Border Style="{StaticResource BarTick}"/>
+                                   <Border Style="{StaticResource BarTick}"/>
+                                   <Border Style="{StaticResource BarTick}"/>
+                                   <Border Style="{StaticResource BarTick}"/>
+                                   <Border Style="{StaticResource BarTick}"/>
+                                   <Border Style="{StaticResource BarTick}"/>
+                                   <Border Style="{StaticResource BarTick}"/>
+                                   <Border/>
+                               </UniformGrid>
+                           </Grid>
+                       </Grid>
+
+                       <!-- TEMP (CPU / GPU dual temperature, like NET UP/DN layout) - last -->
                      <Grid x:Name="TempSection">
                          <Grid.RowDefinitions>
                              <RowDefinition Height="Auto"/>

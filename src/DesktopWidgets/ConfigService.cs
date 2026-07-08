@@ -23,6 +23,7 @@ public class WidgetConfig
         {"NET", true},
         {"DELAY", true},
         {"WIFI", true},
+        {"BAT", true},
         {"IPADDR", true},
         {"IPDNS", true},
         {"PROC", true},

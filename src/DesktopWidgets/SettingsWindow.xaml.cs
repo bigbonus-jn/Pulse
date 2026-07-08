@@ -40,6 +40,7 @@ public partial class SettingsWindow : Window
         ("NET", "NET", false),
         ("DELAY", "DELAY", false),
         ("WIFI", "WIFI", false),
+        ("BAT", "BAT", false),
         ("IPADDR", "IP ADDR", false),
         ("IPDNS", "IP DNS", false),
         ("PROC", "PROC", false),

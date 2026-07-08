@@ -59,7 +59,13 @@ public class NotifyIconWrapper : IDisposable
 
     private static Icon CreateDefaultIcon()
     {
-        // Create a simple 16x16 blue circle icon programmatically
+        // Load embedded pulse.ico
+        var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+        var stream = assembly.GetManifestResourceStream("Pulse.pulse.ico");
+        if (stream != null)
+            return new Icon(stream);
+
+        // Fallback: simple blue circle
         using var bmp = new Bitmap(16, 16);
         using var g = Graphics.FromImage(bmp);
         g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
