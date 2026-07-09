@@ -39,7 +39,7 @@ public partial class SettingsWindow : Window
         ("GPU", "GPU", false),
         ("NET", "NET", false),
         ("DELAY", "DELAY", false),
-        ("WIFI", "WIFI", false),
+        ("RSSI", "RSSI", false),
         ("BAT", "BAT", false),
         ("IPADDR", "IP ADDR", false),
         ("IPDNS", "IP DNS", false),
@@ -131,82 +131,99 @@ public partial class SettingsWindow : Window
 
     private void BuildMonitorCheckboxes()
     {
-        foreach (var (key, display, required) in AllMonitors)
+        // Define pairing order for double-column layout (semantic grouping)
+        // Each pair sits on one row. DELAY gets its own full-width row.
+        var pairs = new (string key, string display, bool required)[,]
         {
-            bool isChecked = _config.Data.MonitorVisibility.TryGetValue(key, out var vis) ? vis : true;
+            { ("CPU", "CPU", true),   ("RAM", "RAM", false) },    // 核心硬件
+            { ("GPU", "GPU", false),  ("NET", "NET", false) },    // 吞吐型
+            { ("RSSI", "RSSI", false),("BAT", "BAT", false) },    // 状态型
+            { ("IPADDR", "IP ADDR", false), ("IPDNS", "IP DNS", false) }, // 地址型
+            { ("PROC", "PROC", false),("TEMP", "TEMP", false) },  // 系统型
+        };
 
-            // DELAY row: checkbox + IP input field
-            if (key == "DELAY")
-            {
-                var row = new System.Windows.Controls.DockPanel { Margin = new Thickness(0, 5, 0, 5) };
+        for (int r = 0; r < pairs.GetLength(0); r++)
+        {
+            var row = new System.Windows.Controls.Grid { Margin = new Thickness(0, 4, 0, 4) };
+            row.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-                var checkbox = new System.Windows.Controls.CheckBox
-                {
-                    Content = "DELAY",
-                    IsChecked = isChecked,
-                    Tag = key,
-                    VerticalContentAlignment = VerticalAlignment.Center,
-                };
-                checkbox.Checked += (_, _) => OnMonitorChecked(key, true);
-                checkbox.Unchecked += (_, _) => OnMonitorChecked(key, false);
+            var left = CreateMonitorCheckbox(pairs[r, 0]);
+            System.Windows.Controls.Grid.SetColumn(left, 0);
+            row.Children.Add(left);
 
-                var ipPanel = new System.Windows.Controls.StackPanel
-                {
-                    Orientation = System.Windows.Controls.Orientation.Horizontal,
-                    HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
-                    VerticalAlignment = VerticalAlignment.Center,
-                };
+            var right = CreateMonitorCheckbox(pairs[r, 1]);
+            System.Windows.Controls.Grid.SetColumn(right, 1);
+            row.Children.Add(right);
 
-                var ipLabel = new System.Windows.Controls.TextBlock
-                {
-                    Text = "IP:",
-                    FontFamily = new System.Windows.Media.FontFamily("Consolas"),
-                    FontSize = 10,
-                    Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x60, 0xFF, 0xF9)),
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 4, 0),
-                };
-
-                _pingTargetBox = new System.Windows.Controls.TextBox
-                {
-                    Text = _config.Data.PingTarget,
-                    Width = 100,
-                    FontSize = 10,
-                    ToolTip = "PING 目标地址",
-                    VerticalAlignment = VerticalAlignment.Center,
-                    VerticalContentAlignment = VerticalAlignment.Center,
-                };
-                _pingTargetBox.LostFocus += PingTargetBox_LostFocus;
-                _pingTargetBox.KeyDown += PingTargetBox_KeyDown;
-
-                ipPanel.Children.Add(ipLabel);
-                ipPanel.Children.Add(_pingTargetBox);
-
-                System.Windows.Controls.DockPanel.SetDock(checkbox, System.Windows.Controls.Dock.Left);
-                row.Children.Add(checkbox);
-                row.Children.Add(ipPanel);
-
-                MonitorCheckList.Children.Add(row);
-            }
-            else
-            {
-                var checkbox = new System.Windows.Controls.CheckBox
-                {
-                    Content = required ? $"{display}  [LOCKED]" : display,
-                    IsChecked = isChecked,
-                    IsEnabled = !required,
-                    Tag = key,
-                };
-
-                if (required)
-                    checkbox.ToolTip = "基础监控项，不可关闭";
-
-                checkbox.Checked += (_, _) => OnMonitorChecked(key, true);
-                checkbox.Unchecked += (_, _) => OnMonitorChecked(key, false);
-
-                MonitorCheckList.Children.Add(checkbox);
-            }
+            MonitorCheckList.Children.Add(row);
         }
+
+        // DELAY: full-width row with IP input (tightly coupled after checkbox)
+        bool delayChecked = _config.Data.MonitorVisibility.TryGetValue("DELAY", out var dv) ? dv : true;
+        var delayRow = new System.Windows.Controls.StackPanel
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal,
+            Margin = new Thickness(0, 4, 0, 4),
+        };
+
+        var delayCb = new System.Windows.Controls.CheckBox
+        {
+            Content = "DELAY",
+            IsChecked = delayChecked,
+            Tag = "DELAY",
+            VerticalContentAlignment = VerticalAlignment.Center,
+        };
+        delayCb.Checked += (_, _) => OnMonitorChecked("DELAY", true);
+        delayCb.Unchecked += (_, _) => OnMonitorChecked("DELAY", false);
+
+        var ipLabel = new System.Windows.Controls.TextBlock
+        {
+            Text = "IP:",
+            FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+            FontSize = 10,
+            Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x60, 0xFF, 0xF9)),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 4, 0),
+        };
+
+        _pingTargetBox = new System.Windows.Controls.TextBox
+        {
+            Text = _config.Data.PingTarget,
+            Width = 100,
+            FontSize = 10,
+            ToolTip = "PING 目标地址",
+            VerticalAlignment = VerticalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+        };
+        _pingTargetBox.LostFocus += PingTargetBox_LostFocus;
+        _pingTargetBox.KeyDown += PingTargetBox_KeyDown;
+
+        delayRow.Children.Add(delayCb);
+        delayRow.Children.Add(ipLabel);
+        delayRow.Children.Add(_pingTargetBox);
+
+        MonitorCheckList.Children.Add(delayRow);
+    }
+
+    private System.Windows.Controls.CheckBox CreateMonitorCheckbox((string key, string display, bool required) item)
+    {
+        bool isChecked = _config.Data.MonitorVisibility.TryGetValue(item.key, out var vis) ? vis : true;
+        var checkbox = new System.Windows.Controls.CheckBox
+        {
+            Content = item.required ? $"{item.display}  [LOCKED]" : item.display,
+            IsChecked = isChecked,
+            IsEnabled = !item.required,
+            Tag = item.key,
+        };
+
+        if (item.required)
+            checkbox.ToolTip = "基础监控项，不可关闭";
+
+        checkbox.Checked += (_, _) => OnMonitorChecked(item.key, true);
+        checkbox.Unchecked += (_, _) => OnMonitorChecked(item.key, false);
+
+        return checkbox;
     }
 
     private void PingTargetBox_LostFocus(object sender, RoutedEventArgs e)

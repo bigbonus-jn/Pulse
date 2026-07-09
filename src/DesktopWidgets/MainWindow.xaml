@@ -63,7 +63,7 @@
         <DropShadowEffect x:Key="MagentaGlow" ShadowDepth="0" BlurRadius="6" Color="#FF2A6D" Opacity="0.6"/>
         <DropShadowEffect x:Key="YellowGlow" ShadowDepth="0" BlurRadius="6" Color="#FFD700" Opacity="0.6"/>
         <DropShadowEffect x:Key="WhiteGlow" ShadowDepth="0" BlurRadius="5" Color="#FFFFFF" Opacity="0.4"/>
-        <DropShadowEffect x:Key="PurpleGlow" ShadowDepth="0" BlurRadius="6" Color="#BD93F9" Opacity="0.6"/>
+        <DropShadowEffect x:Key="PurpleGlow" ShadowDepth="0" BlurRadius="8" Color="#BD93F9" Opacity="0.8"/>
         <DropShadowEffect x:Key="RedGlow" ShadowDepth="0" BlurRadius="6" Color="#FF5555" Opacity="0.6"/>
         <DropShadowEffect x:Key="TealGlow" ShadowDepth="0" BlurRadius="6" Color="#00CED1" Opacity="0.6"/>
         <!-- Cyberpunk thin scrollbar -->
@@ -177,18 +177,19 @@
                                      Effect="{StaticResource MagentaGlow}"/>
                             <Ellipse Width="4" Height="4" Fill="#FFD700" Margin="0,0,3,0"
                                      Effect="{StaticResource YellowGlow}"/>
-                            <TextBlock Text="PULSE" FontFamily="Consolas" FontSize="10"
-                                       Foreground="#7F00FFF9" FontWeight="Bold"
-                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="PULSE" FontFamily="Consolas" FontSize="11"
+                                       Foreground="#CC00FFF9" FontWeight="Bold"
+                                       VerticalAlignment="Center"
+                                       Effect="{StaticResource CyanGlow}"/>
                         </StackPanel>
                     </Border>
 
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
                                 HorizontalAlignment="Right" Margin="0,0,10,0">
                         <TextBlock x:Name="DateLabel" Text="----/--/--"
-                                   FontFamily="Consolas" FontSize="10"
-                                   Foreground="#BF00FFF9"
-                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    FontFamily="Consolas" FontSize="11"
+                                    Foreground="#E600FFF9"
+                                    VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <!-- Pin/Topmost toggle -->
                         <Button x:Name="PinToggle" Click="PinToggle_Click"
                                 Width="18" Height="18" Margin="0,0,3,0"
@@ -226,14 +227,45 @@
                 </DockPanel>
 
                 <!-- Bottom bar -->
-                <Grid DockPanel.Dock="Bottom" Height="22">
+                <StackPanel DockPanel.Dock="Bottom">
+                    <!-- IP info row (collapsible) -->
+                    <Grid x:Name="IpRow" Margin="10,0,10,0">
+                        <Border Height="1" VerticalAlignment="Top" Background="#1400FFF9"/>
+                        <Grid Margin="0,5,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="AddrLabel" Grid.Column="0" Text="IP" FontFamily="Consolas"
+                                       FontSize="11" FontWeight="Bold" Foreground="#D4ADFF"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,5,0"/>
+                            <TextBlock x:Name="AddrValue" Grid.Column="1" Text="N/A" FontFamily="Consolas"
+                                       FontSize="11" Foreground="#E6CCFF"
+                                       Effect="{StaticResource PurpleGlow}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,12,0"/>
+                            <TextBlock x:Name="DnsLabel" Grid.Column="2" Text="DNS" FontFamily="Consolas"
+                                       FontSize="11" FontWeight="Bold" Foreground="#D4ADFF"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,5,0"/>
+                            <TextBlock x:Name="DnsValue" Grid.Column="3" Text="N/A" FontFamily="Consolas"
+                                       FontSize="11" Foreground="#E6CCFF"
+                                       Effect="{StaticResource PurpleGlow}"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </Grid>
+                    <!-- Main bottom bar -->
+                    <Grid Height="22">
                     <Border Height="1" VerticalAlignment="Top" Background="#1400FFF9"/>
                     <!-- Left: version + opacity bar -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
                                 HorizontalAlignment="Left" Margin="10,0,0,0">
-                         <TextBlock Text="v0.10" FontFamily="Consolas" FontSize="9"
-                                   Foreground="#26FFFFFF" VerticalAlignment="Center"
-                                   Margin="0,0,6,0"/>
+                         <TextBlock Text="v0.13" FontFamily="Consolas" FontSize="9"
+                                    Foreground="#26FFFFFF" VerticalAlignment="Center"
+                                    Margin="0,0,6,0"/>
                         <Grid x:Name="OpacityBar" Width="60" Height="14"
                               VerticalAlignment="Center" Cursor="Hand" ToolTip="背景透明度"
                               Background="#08000000"
@@ -256,14 +288,14 @@
                     </StackPanel>
                     <!-- Clock: centered; Uptime: positioned right of clock via code-behind -->
                     <TextBlock x:Name="ClockLabel" Text="--:--:--"
-                               FontFamily="Consolas" FontSize="11"
-                               Foreground="#BF00FFF9"
+                               FontFamily="Consolas" FontSize="12"
+                               Foreground="#E600FFF9"
                                VerticalAlignment="Center"
                                HorizontalAlignment="Center"
                                Effect="{StaticResource CyanGlow}"/>
                     <TextBlock x:Name="UptimeLabel" Text=""
-                               FontFamily="Consolas" FontSize="11"
-                               Foreground="#4D00FFF9"
+                               FontFamily="Consolas" FontSize="10"
+                               Foreground="#8000FFF9"
                                VerticalAlignment="Center"
                                HorizontalAlignment="Left"
                                ToolTip="系统运行时间"/>
@@ -279,7 +311,8 @@
                             Margin="0,0,8,0"
                             Cursor="Hand" ToolTip="退出程序"
                             Effect="{StaticResource RedGlow}"/>
-                </Grid>
+                    </Grid>
+                </StackPanel>
 
                 <!-- Metrics content (scrollable) -->
                 <ScrollViewer x:Name="MetricsScroll"
@@ -465,33 +498,7 @@
                          </Grid>
                      </Grid>
 
-                     <!-- ADDR (local IP address) -->
-                     <Grid x:Name="AddrSection" Margin="0,0,0,7">
-                         <DockPanel x:Name="AddrHeaderRow">
-                               <TextBlock x:Name="AddrLabel" Text="IP ADDR" FontFamily="Consolas"
-                                         FontSize="11" FontWeight="Bold" Foreground="#BD93F9"
-                                         Effect="{StaticResource PurpleGlow}"/>
-                              <TextBlock x:Name="AddrValue" Text="N/A" FontFamily="Consolas"
-                                         FontSize="11" Foreground="#BD93F9"
-                                         HorizontalAlignment="Right"
-                                         Effect="{StaticResource PurpleGlow}"/>
-                         </DockPanel>
-                     </Grid>
-
-                     <!-- DNS -->
-                     <Grid x:Name="DnsSection" Margin="0,0,0,7">
-                         <DockPanel x:Name="DnsHeaderRow">
-                              <TextBlock x:Name="DnsLabel" Text="IP DNS" FontFamily="Consolas"
-                                         FontSize="11" FontWeight="Bold" Foreground="#BD93F9"
-                                         Effect="{StaticResource PurpleGlow}"/>
-                              <TextBlock x:Name="DnsValue" Text="N/A" FontFamily="Consolas"
-                                         FontSize="11" Foreground="#BD93F9"
-                                         HorizontalAlignment="Right"
-                                         Effect="{StaticResource PurpleGlow}"/>
-                         </DockPanel>
-                     </Grid>
-
-                      <!-- PROC -->
+                       <!-- PROC -->
                      <Grid x:Name="ProcSection" Margin="0,0,0,7">
                          <Grid.RowDefinitions>
                              <RowDefinition Height="Auto"/>
@@ -532,7 +539,7 @@
                               <RowDefinition Height="Auto"/>
                           </Grid.RowDefinitions>
                           <DockPanel x:Name="WifiHeaderRow" Grid.Row="0">
-                               <TextBlock x:Name="WifiLabel" Text="WIFI" FontFamily="Consolas"
+                                <TextBlock x:Name="WifiLabel" Text="RSSI" FontFamily="Consolas"
                                           FontSize="11" FontWeight="Bold" Foreground="#00FFF9"
                                           Effect="{StaticResource CyanGlow}"/>
                                <TextBlock x:Name="WifiValue" Text="N/A" FontFamily="Consolas"

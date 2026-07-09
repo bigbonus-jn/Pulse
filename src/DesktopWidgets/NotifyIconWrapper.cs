@@ -12,6 +12,7 @@ public class NotifyIconWrapper : IDisposable
     private readonly System.Windows.Forms.NotifyIcon _notifyIcon;
     private readonly MainWindow _mainWindow;
     private readonly AutoStartService _autoStart = new();
+    private System.Windows.Forms.ToolStripMenuItem? _compactMenuItem;
 
     public NotifyIconWrapper(MainWindow mainWindow)
     {
@@ -25,20 +26,34 @@ public class NotifyIconWrapper : IDisposable
         };
 
         var menu = new System.Windows.Forms.ContextMenuStrip();
-        menu.Items.Add("Show / Hide", null, OnToggleVisibility);
-        menu.Items.Add("Toggle Click-Through", null, OnToggleClickThrough);
-        menu.Items.Add("Toggle Compact Mode", null, OnToggleCompact);
+        menu.Items.Add("显示 / 隐藏", null, OnToggleVisibility);
+        _compactMenuItem = CreateCompactMenuItem();
+        menu.Items.Add(_compactMenuItem);
         menu.Items.Add(CreateAutoStartMenuItem());
         menu.Items.Add("-");
-        menu.Items.Add("Exit", null, OnExit);
+        menu.Items.Add("退出", null, OnExit);
 
         _notifyIcon.ContextMenuStrip = menu;
         _notifyIcon.DoubleClick += OnToggleVisibility;
     }
 
+    private System.Windows.Forms.ToolStripMenuItem CreateCompactMenuItem()
+    {
+        var item = new System.Windows.Forms.ToolStripMenuItem("简洁模式");
+        item.Checked = _mainWindow.IsCompact;
+        item.Click += OnToggleCompact;
+        return item;
+    }
+
+    public void SyncCompactState(bool isCompact)
+    {
+        if (_compactMenuItem != null)
+            _compactMenuItem.Checked = isCompact;
+    }
+
     private System.Windows.Forms.ToolStripMenuItem CreateAutoStartMenuItem()
     {
-        var item = new System.Windows.Forms.ToolStripMenuItem("Auto-Start on Boot");
+        var item = new System.Windows.Forms.ToolStripMenuItem("开机自启");
         item.Checked = _autoStart.IsEnabled;
         item.Click += OnToggleAutoStart;
         return item;
@@ -84,14 +99,11 @@ public class NotifyIconWrapper : IDisposable
             _mainWindow.ShowWindow();
     }
 
-    private void OnToggleClickThrough(object? sender, EventArgs e)
-    {
-        _mainWindow.ToggleClickThrough();
-    }
-
     private void OnToggleCompact(object? sender, EventArgs e)
     {
         _mainWindow.ToggleCompactMode();
+        if (_compactMenuItem != null)
+            _compactMenuItem.Checked = _mainWindow.IsCompact;
     }
 
     private void OnExit(object? sender, EventArgs e)

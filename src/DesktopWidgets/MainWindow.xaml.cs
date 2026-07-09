@@ -19,8 +19,9 @@ public partial class MainWindow : Window
     private readonly ConfigService _config = new();
     private SettingsWindow? _settingsWindow;
     private bool _cpuFirstSample = true;
-    private bool _isCompact;
-    private bool _isPinned = true;  // topmost pin state
+     private bool _isCompact;
+     public bool IsCompact => _isCompact;
+     private bool _isPinned = true;  // topmost pin state
     private bool _isLocked;        // lock position (prevent drag)
     private bool _isDraggingOpacity;  // opacity bar drag state
     private double _bgAlpha = 1.0;  // background alpha 0.2~1.0
@@ -198,11 +199,16 @@ public partial class MainWindow : Window
         NetSection.Visibility   = vis.GetValueOrDefault("NET", true)    ? Visibility.Visible : Visibility.Collapsed;
         PingSection.Visibility  = vis.GetValueOrDefault("DELAY", true)  ? Visibility.Visible : Visibility.Collapsed;
         WifiSection.Visibility  = vis.GetValueOrDefault("WIFI", true)   ? Visibility.Visible : Visibility.Collapsed;
-        AddrSection.Visibility  = vis.GetValueOrDefault("IPADDR", true) ? Visibility.Visible : Visibility.Collapsed;
-        DnsSection.Visibility   = vis.GetValueOrDefault("IPDNS", true)  ? Visibility.Visible : Visibility.Collapsed;
         ProcSection.Visibility  = vis.GetValueOrDefault("PROC", true)   ? Visibility.Visible : Visibility.Collapsed;
         TempSection.Visibility  = vis.GetValueOrDefault("TEMP", true)   ? Visibility.Visible : Visibility.Collapsed;
         BatSection.Visibility   = (_hasBattery && vis.GetValueOrDefault("BAT", true)) ? Visibility.Visible : Visibility.Collapsed;
+
+        // IP row in bottom bar: show if either IPADDR or IPDNS is enabled
+        bool showIp = vis.GetValueOrDefault("IPADDR", true) || vis.GetValueOrDefault("IPDNS", true);
+        IpRow.Visibility = showIp ? Visibility.Visible : Visibility.Collapsed;
+        // Hide individual parts if user toggled them off
+        AddrLabel.Visibility = AddrValue.Visibility = vis.GetValueOrDefault("IPADDR", true) ? Visibility.Visible : Visibility.Collapsed;
+        DnsLabel.Visibility = DnsValue.Visibility = vis.GetValueOrDefault("IPDNS", true) ? Visibility.Visible : Visibility.Collapsed;
 
         // Update DELAY label to reflect current PingTarget
         UpdatePingLabel();
@@ -306,7 +312,7 @@ public partial class MainWindow : Window
             NetUpBarContainer.Height = 5; NetDnBarContainer.Height = 5;
             NetLabel.FontSize = 9;
 
-            // ADDR & DNS: reduce font and margin (text-only rows)
+            // ADDR & DNS: now in bottom bar IP row — shrink in compact
             AddrLabel.FontSize = 9;
             DnsLabel.FontSize = 9;
             AddrValue.FontSize = 9;
@@ -330,8 +336,6 @@ public partial class MainWindow : Window
             PingSection.Margin = new Thickness(0, 0, 0, 2);
             WifiSection.Margin = new Thickness(0, 0, 0, 2);
             BatSection.Margin = new Thickness(0, 0, 0, 2);
-            AddrSection.Margin = new Thickness(0, 0, 0, 2);
-            DnsSection.Margin = new Thickness(0, 0, 0, 2);
             ProcSection.Margin = new Thickness(0, 0, 0, 2);
             TempSection.Margin = new Thickness(0, 0, 0, 0);
         }
@@ -358,7 +362,7 @@ public partial class MainWindow : Window
             NetUpBarContainer.Height = 6; NetDnBarContainer.Height = 6;
             NetLabel.FontSize = 11;
 
-            // ADDR & DNS: restore font and margin
+            // ADDR & DNS: restore font in bottom bar
             AddrLabel.FontSize = 11;
             DnsLabel.FontSize = 11;
             AddrValue.FontSize = 11;
@@ -382,14 +386,15 @@ public partial class MainWindow : Window
             PingSection.Margin = new Thickness(0, 0, 0, 7);
             WifiSection.Margin = new Thickness(0, 0, 0, 7);
             BatSection.Margin = new Thickness(0, 0, 0, 7);
-            AddrSection.Margin = new Thickness(0, 0, 0, 7);
-            DnsSection.Margin = new Thickness(0, 0, 0, 7);
             ProcSection.Margin = new Thickness(0, 0, 0, 7);
             TempSection.Margin = new Thickness(0, 0, 0, 0);
         }
 
         // Resize window to fit content after compact/normal switch
         ScheduleResize();
+
+        // Sync tray menu check state
+        _notifyIcon?.SyncCompactState(_isCompact);
     }
 
     private void SetMetricGridCompact(System.Windows.Controls.Grid section, System.Windows.Controls.DockPanel header, System.Windows.Controls.Grid bar, System.Windows.Controls.TextBlock label)
@@ -674,18 +679,18 @@ public partial class MainWindow : Window
             }
         });
 
-        // Uptime (every 1s — very cheap)
-        UpdateUptime();
+        // Uptime (every 1s — WMI query must be off-UI-thread)
+        UpdateUptimeAsync();
 
         // DELAY / PING (every 1s — moved from slow metrics for responsiveness)
         UpdatePing();
 
-        // Slow metrics (every 5s): TEMP, PROC
+        // Slow metrics (every 5s): TEMP, PROC, WIFI, BAT
         _slowTickCounter++;
         if (_slowTickCounter >= 5)
         {
             _slowTickCounter = 0;
-            UpdateSlowMetrics();
+            UpdateSlowMetricsAsync();
         }
 
         // IP / DNS (every 30s — rarely changes, low refresh is fine)
@@ -693,181 +698,154 @@ public partial class MainWindow : Window
         if (_ipTickCounter >= 30)
         {
             _ipTickCounter = 0;
-            UpdateIpDns();
+            UpdateIpDnsAsync();
         }
     }
 
-    private void UpdateSlowMetrics()
-    {
-        // DISK (reserved — data collection kept for future re-enable)
-        // double diskPercent = 0;
-        // string diskInfo = "N/A";
-        // try
-        // {
-        //     var drive = System.IO.DriveInfo.GetDrives()
-        //         .FirstOrDefault(d => d.IsReady && d.RootDirectory.FullName == "C:\\");
-        //     if (drive != null)
-        //     {
-        //         double diskTotalGB = Math.Round(drive.TotalSize / (1024.0 * 1024 * 1024), 0);
-        //         double diskUsedGB = Math.Round((drive.TotalSize - drive.AvailableFreeSpace) / (1024.0 * 1024 * 1024), 1);
-        //         diskPercent = Math.Round((1.0 - (double)drive.AvailableFreeSpace / drive.TotalSize) * 100, 1);
-        //         diskInfo = $"{diskUsedGB:F0}/{diskTotalGB:F0} GB";
-        //     }
-        // }
-        // catch { }
+    private bool _slowMetricsInProgress;
 
-        // TEMP (CPU / GPU dual temperature via LibreHardwareMonitor)
-        // Strategy: read from actual hardware sensors only. If sensors don't exist or
-        // return no value (e.g. HP BIOS blocks CPU temp, iGPU has no temp sensor),
-        // show "N/A" with a dimmed color and a tooltip explaining the hardware limitation.
-        double cpuTemp = 0; bool cpuTempAvailable = false;
-        bool cpuHasSensors = false;   // true if CPU temp sensors exist (even if values are null)
-        double gpuTemp = 0; bool gpuTempAvailable = false;
-        bool gpuHasSensors = false;   // true if GPU temp sensors exist
-        bool gpuHardwareFound = false; // true if any GPU hardware is detected at all
+    private async void UpdateSlowMetricsAsync()
+    {
+        if (_slowMetricsInProgress) return;  // prevent overlapping
+        _slowMetricsInProgress = true;
 
         try
         {
-            foreach (var hardware in _computer.Hardware)
+            // ── TEMP: LibreHardwareMonitor (can block 100-500ms) ──
+            double cpuTemp = 0; bool cpuTempAvailable = false;
+            bool cpuHasSensors = false;
+            double gpuTemp = 0; bool gpuTempAvailable = false;
+            bool gpuHasSensors = false;
+            bool gpuHardwareFound = false;
+
+            await Task.Run(() =>
             {
-                hardware.Update();
-
-                // CPU temperature: Package → any core (skip "Distance to TjMax")
-                if (hardware.HardwareType == HardwareType.Cpu && !cpuTempAvailable)
+                try
                 {
-                    foreach (var sensor in hardware.Sensors)
+                    foreach (var hardware in _computer.Hardware)
                     {
-                        if (sensor.SensorType != SensorType.Temperature) continue;
-                        if (sensor.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase)) continue;
+                        hardware.Update();
 
-                        cpuHasSensors = true;  // there IS a CPU temp sensor, value may or may not be null
-
-                        if (sensor.Value.HasValue)
+                        if (hardware.HardwareType == HardwareType.Cpu && !cpuTempAvailable)
                         {
-                            // Prefer "Package" sensor, otherwise take first available
-                            if (sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase))
+                            foreach (var sensor in hardware.Sensors)
                             {
-                                cpuTemp = Math.Round(sensor.Value.Value, 0);
-                                cpuTempAvailable = true;
-                                break;
-                            }
-                            if (!cpuTempAvailable)
-                            {
-                                cpuTemp = Math.Round(sensor.Value.Value, 0);
-                                cpuTempAvailable = true;
-                                // don't break — keep looking for Package sensor
+                                if (sensor.SensorType != SensorType.Temperature) continue;
+                                if (sensor.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase)) continue;
+                                cpuHasSensors = true;
+                                if (sensor.Value.HasValue)
+                                {
+                                    if (sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase))
+                                    { cpuTemp = Math.Round(sensor.Value.Value, 0); cpuTempAvailable = true; break; }
+                                    if (!cpuTempAvailable)
+                                    { cpuTemp = Math.Round(sensor.Value.Value, 0); cpuTempAvailable = true; }
+                                }
                             }
                         }
-                    }
-                }
 
-                // GPU temperature: Core → any GPU temp
-                if (hardware.HardwareType == HardwareType.GpuNvidia ||
-                    hardware.HardwareType == HardwareType.GpuAmd ||
-                    hardware.HardwareType == HardwareType.GpuIntel)
-                {
-                    gpuHardwareFound = true;
-                    if (!gpuTempAvailable)
-                    {
-                        foreach (var sensor in hardware.Sensors)
+                        if (hardware.HardwareType == HardwareType.GpuNvidia ||
+                            hardware.HardwareType == HardwareType.GpuAmd ||
+                            hardware.HardwareType == HardwareType.GpuIntel)
                         {
-                            if (sensor.SensorType != SensorType.Temperature) continue;
-                            if (sensor.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase)) continue;
-
-                            gpuHasSensors = true;
-
-                            if (sensor.Value.HasValue)
+                            gpuHardwareFound = true;
+                            if (!gpuTempAvailable)
                             {
-                                if (sensor.Name.Contains("Core", StringComparison.OrdinalIgnoreCase))
+                                foreach (var sensor in hardware.Sensors)
                                 {
-                                    gpuTemp = Math.Round(sensor.Value.Value, 0);
-                                    gpuTempAvailable = true;
-                                    break;
-                                }
-                                if (!gpuTempAvailable)
-                                {
-                                    gpuTemp = Math.Round(sensor.Value.Value, 0);
-                                    gpuTempAvailable = true;
+                                    if (sensor.SensorType != SensorType.Temperature) continue;
+                                    if (sensor.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase)) continue;
+                                    gpuHasSensors = true;
+                                    if (sensor.Value.HasValue)
+                                    {
+                                        if (sensor.Name.Contains("Core", StringComparison.OrdinalIgnoreCase))
+                                        { gpuTemp = Math.Round(sensor.Value.Value, 0); gpuTempAvailable = true; break; }
+                                        if (!gpuTempAvailable)
+                                        { gpuTemp = Math.Round(sensor.Value.Value, 0); gpuTempAvailable = true; }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        }
-        catch { }
+                catch { }
+            });
 
-        // Update TEMP display
-        string cpuTempStr = cpuTempAvailable ? $"{cpuTemp:F0}°" : "N/A";
-        string gpuTempStr = gpuTempAvailable ? $"{gpuTemp:F0}°" : "N/A";
-        TempValue.Text = $"{cpuTempStr} / {gpuTempStr}";
+            // Update TEMP UI (back on UI thread)
+            string cpuTempStr = cpuTempAvailable ? $"{cpuTemp:F0}°" : "N/A";
+            string gpuTempStr = gpuTempAvailable ? $"{gpuTemp:F0}°" : "N/A";
+            TempValue.Text = $"{cpuTempStr} / {gpuTempStr}";
 
-        // CPU tag & color
-        TempCpuTag.Text = "CPU";
-        if (cpuTempAvailable)
-        {
-            TempCpuTag.ToolTip = null;
-            if (TempCpuBarContainer.ActualWidth > 0)
+            TempCpuTag.Text = "CPU";
+            if (cpuTempAvailable)
             {
-                TempCpuFill.Width = (cpuTemp / 100.0) * TempCpuBarContainer.ActualWidth;
-                TempCpuFill.Fill = cpuTemp > 80 ? FindResource("RedBar") as System.Windows.Media.Brush
-                                 : cpuTemp > 60 ? FindResource("YellowBar") as System.Windows.Media.Brush
-                                 : FindResource("CyanBar") as System.Windows.Media.Brush;
+                TempCpuTag.ToolTip = null;
+                if (TempCpuBarContainer.ActualWidth > 0)
+                {
+                    TempCpuFill.Width = (cpuTemp / 100.0) * TempCpuBarContainer.ActualWidth;
+                    TempCpuFill.Fill = cpuTemp > 80 ? FindResource("RedBar") as System.Windows.Media.Brush
+                                     : cpuTemp > 60 ? FindResource("YellowBar") as System.Windows.Media.Brush
+                                     : FindResource("CyanBar") as System.Windows.Media.Brush;
+                }
+                TempCpuTag.Foreground = FindResource("CyanBar") as System.Windows.Media.Brush;
             }
-        }
-        else
-        {
-            TempCpuFill.Width = 0;
-            TempCpuTag.Foreground = DimText;
-            TempCpuTag.ToolTip = cpuHasSensors
-                ? "CPU 温度传感器存在但 BIOS 未暴露数据（部分笔记本限制）"
-                : "未检测到 CPU 温度传感器";
-        }
-        if (cpuTempAvailable) TempCpuTag.Foreground = FindResource("CyanBar") as System.Windows.Media.Brush;
-
-        // GPU tag & color
-        TempGpuTag.Text = "GPU";
-        if (gpuTempAvailable)
-        {
-            TempGpuTag.ToolTip = null;
-            if (TempGpuBarContainer.ActualWidth > 0)
+            else
             {
-                TempGpuFill.Width = (gpuTemp / 100.0) * TempGpuBarContainer.ActualWidth;
-                TempGpuFill.Fill = gpuTemp > 80 ? FindResource("RedBar") as System.Windows.Media.Brush
-                                 : gpuTemp > 60 ? FindResource("YellowBar") as System.Windows.Media.Brush
-                                 : FindResource("YellowBar") as System.Windows.Media.Brush;
+                TempCpuFill.Width = 0;
+                TempCpuTag.Foreground = DimText;
+                TempCpuTag.ToolTip = cpuHasSensors
+                    ? "CPU 温度传感器存在但 BIOS 未暴露数据（部分笔记本限制）"
+                    : "未检测到 CPU 温度传感器";
             }
+
+            TempGpuTag.Text = "GPU";
+            if (gpuTempAvailable)
+            {
+                TempGpuTag.ToolTip = null;
+                if (TempGpuBarContainer.ActualWidth > 0)
+                {
+                    TempGpuFill.Width = (gpuTemp / 100.0) * TempGpuBarContainer.ActualWidth;
+                    TempGpuFill.Fill = gpuTemp > 80 ? FindResource("RedBar") as System.Windows.Media.Brush
+                                     : gpuTemp > 60 ? FindResource("YellowBar") as System.Windows.Media.Brush
+                                     : FindResource("YellowBar") as System.Windows.Media.Brush;
+                }
+                TempGpuTag.Foreground = FindResource("YellowBar") as System.Windows.Media.Brush;
+            }
+            else
+            {
+                TempGpuFill.Width = 0;
+                TempGpuTag.Foreground = DimText;
+                TempGpuTag.ToolTip = gpuHardwareFound
+                    ? (gpuHasSensors
+                        ? "GPU 温度传感器存在但未返回数据"
+                        : "当前 GPU 为集成显卡，无温度传感器")
+                    : "未检测到独立 GPU";
+            }
+
+            // ── PROC (process count — can be slow) ──
+            int procCount = await Task.Run(() =>
+            {
+                try { return Process.GetProcesses().Length; } catch { return 0; }
+            });
+            ProcValue.Text = procCount.ToString();
+            ProcValue.Foreground = TealText;
+            ProcFill.Width = Math.Min(1, procCount / 300.0) * ProcBarContainer.ActualWidth;
+
+            // ── WIFI (WMI/netsh — both blocking) ──
+            _wifiTickCounter++;
+            int wifiInterval = _wifiWmiAvailable ? 5 : 30;
+            if (_wifiTickCounter >= wifiInterval)
+            {
+                _wifiTickCounter = 0;
+                await UpdateWifiSignalAsync();
+            }
+
+            // ── BAT (battery — cheap WinForms API, no blocking) ──
+            UpdateBattery();
         }
-        else
+        finally
         {
-            TempGpuFill.Width = 0;
-            TempGpuTag.Foreground = DimText;
-            TempGpuTag.ToolTip = gpuHardwareFound
-                ? (gpuHasSensors
-                    ? "GPU 温度传感器存在但未返回数据"
-                    : "当前 GPU 为集成显卡，无温度传感器")
-                : "未检测到独立 GPU";
+            _slowMetricsInProgress = false;
         }
-        if (gpuTempAvailable) TempGpuTag.Foreground = FindResource("YellowBar") as System.Windows.Media.Brush;
-
-        // PROC (process count)
-        int procCount = 0;
-        try { procCount = Process.GetProcesses().Length; } catch { }
-        ProcValue.Text = procCount.ToString();
-        ProcValue.Foreground = TealText;
-        ProcFill.Width = Math.Min(1, procCount / 300.0) * ProcBarContainer.ActualWidth;
-
-        // WIFI (signal strength) — WMI every 5s, netsh every 30s (avoids location service flash)
-        _wifiTickCounter++;
-        int wifiInterval = _wifiWmiAvailable ? 5 : 30;  // WMI: 5s, netsh fallback: 30s
-        if (_wifiTickCounter >= wifiInterval)
-        {
-            _wifiTickCounter = 0;
-            UpdateWifiSignal();
-        }
-
-        // BAT (battery level)
-        UpdateBattery();
     }
 
     private bool _pingInProgress;  // prevent overlapping async pings
@@ -914,128 +892,142 @@ public partial class MainWindow : Window
         }
     }
 
-    private void UpdateIpDns()
+    private async void UpdateIpDnsAsync()
     {
-        string localIps = "N/A";
-        string dnsServer = "N/A";
         try
         {
-            // Collect candidates: UP, non-loopback, non-virtual adapters with a valid IPv4
-            var candidates = new List<(NetworkInterface ni, System.Net.IPAddress ip, System.Net.IPAddress? dns, bool hasGateway)>();
-
-            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+            var (localIps, dnsServer) = await Task.Run(() =>
             {
-                if (ni.OperationalStatus != OperationalStatus.Up) continue;
-                if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+                string ips = "N/A";
+                string dns = "N/A";
+                try
+                {
+                    var candidates = new List<(NetworkInterface ni, System.Net.IPAddress ip, System.Net.IPAddress? dns, bool hasGateway)>();
 
-                // Filter out virtual / tunnel adapters
-                string name = ni.Name;
-                string desc = ni.Description;
-                if (name.Contains("Hyper-V", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("vEthernet", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("WSL", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("Docker", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("Tunnel", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("isatap", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("Teredo", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("6to4", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("VMware", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("VMnet", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("TAP", StringComparison.OrdinalIgnoreCase) ||
-                    desc.Contains("VMware", StringComparison.OrdinalIgnoreCase) ||
-                    desc.Contains("Virtual", StringComparison.OrdinalIgnoreCase) ||
-                    desc.Contains("TAP-Windows", StringComparison.OrdinalIgnoreCase))
-                    continue;
+                    foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+                    {
+                        if (ni.OperationalStatus != OperationalStatus.Up) continue;
+                        if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
 
-                var ipProps = ni.GetIPProperties();
-                var unicast = ipProps.UnicastAddresses
-                    .FirstOrDefault(a => a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
-                                      && !a.Address.ToString().StartsWith("169."));
-                if (unicast == null) continue;
+                        string name = ni.Name;
+                        string desc = ni.Description;
+                        if (name.Contains("Hyper-V", StringComparison.OrdinalIgnoreCase) ||
+                            name.Contains("vEthernet", StringComparison.OrdinalIgnoreCase) ||
+                            name.Contains("WSL", StringComparison.OrdinalIgnoreCase) ||
+                            name.Contains("Docker", StringComparison.OrdinalIgnoreCase) ||
+                            name.Contains("Tunnel", StringComparison.OrdinalIgnoreCase) ||
+                            name.Contains("isatap", StringComparison.OrdinalIgnoreCase) ||
+                            name.Contains("Teredo", StringComparison.OrdinalIgnoreCase) ||
+                            name.Contains("6to4", StringComparison.OrdinalIgnoreCase) ||
+                            name.Contains("VMware", StringComparison.OrdinalIgnoreCase) ||
+                            name.Contains("VMnet", StringComparison.OrdinalIgnoreCase) ||
+                            name.Contains("TAP", StringComparison.OrdinalIgnoreCase) ||
+                            desc.Contains("VMware", StringComparison.OrdinalIgnoreCase) ||
+                            desc.Contains("Virtual", StringComparison.OrdinalIgnoreCase) ||
+                            desc.Contains("TAP-Windows", StringComparison.OrdinalIgnoreCase))
+                            continue;
 
-                var dns = ipProps.DnsAddresses
-                    .FirstOrDefault(d => d.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                        var ipProps = ni.GetIPProperties();
+                        var unicast = ipProps.UnicastAddresses
+                            .FirstOrDefault(a => a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
+                                              && !a.Address.ToString().StartsWith("169."));
+                        if (unicast == null) continue;
 
-                bool hasGateway = ipProps.GatewayAddresses
-                    .Any(g => g.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                        var dnsAddr = ipProps.DnsAddresses
+                            .FirstOrDefault(d => d.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
 
-                candidates.Add((ni, unicast.Address, dns, hasGateway));
-            }
+                        bool hasGateway = ipProps.GatewayAddresses
+                            .Any(g => g.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
 
-            if (candidates.Count > 0)
-            {
-                // Primary adapter = one with default gateway (internet route)
-                var primary = candidates.FirstOrDefault(c => c.hasGateway);
-                if (primary.ni == null) primary = candidates[0];
+                        candidates.Add((ni, unicast.Address, dnsAddr, hasGateway));
+                    }
 
-                // DNS from primary adapter only
-                if (primary.dns != null) dnsServer = primary.dns.ToString();
+                    if (candidates.Count > 0)
+                    {
+                        var primary = candidates.FirstOrDefault(c => c.hasGateway);
+                        if (primary.ni == null) primary = candidates[0];
+                        if (primary.dns != null) dns = primary.dns.ToString();
 
-                // Show all IPs: primary first, then others (gateway-prioritized order)
-                var ordered = candidates
-                    .OrderByDescending(c => c.hasGateway)
-                    .ThenBy(c => c.ni.NetworkInterfaceType != NetworkInterfaceType.Wireless80211)  // WiFi next
-                    .Select(c => c.ip.ToString())
-                    .ToList();
-                localIps = string.Join(" / ", ordered);
-            }
+                        var ordered = candidates
+                            .OrderByDescending(c => c.hasGateway)
+                            .ThenBy(c => c.ni.NetworkInterfaceType != NetworkInterfaceType.Wireless80211)
+                            .Select(c => c.ip.ToString())
+                            .ToList();
+                        ips = string.Join(" / ", ordered);
+                    }
+                }
+                catch { }
+                return (ips, dns);
+            });
+
+            AddrValue.Text = localIps;
+            DnsValue.Text = dnsServer;
         }
         catch { }
-        AddrValue.Text = localIps;
-        DnsValue.Text = dnsServer;
     }
 
-    private void UpdateUptime()
+    private async void UpdateUptimeAsync()
     {
         try
         {
-            using var searcher = new ManagementObjectSearcher("SELECT LastBootUpTime FROM Win32_OperatingSystem");
-            foreach (ManagementObject obj in searcher.Get())
+            var result = await Task.Run(() =>
             {
-                var bootTimeStr = obj["LastBootUpTime"]?.ToString();
-                if (bootTimeStr == null) continue;
-                // WMI datetime format: 20260706103000.500000+480
-                var bootTime = ManagementDateTimeConverter.ToDateTime(bootTimeStr);
-                var span = DateTime.Now - bootTime;
+                using var searcher = new ManagementObjectSearcher("SELECT LastBootUpTime FROM Win32_OperatingSystem");
+                foreach (ManagementObject obj in searcher.Get())
+                {
+                    var bootTimeStr = obj["LastBootUpTime"]?.ToString();
+                    if (bootTimeStr == null) continue;
+                    var bootTime = ManagementDateTimeConverter.ToDateTime(bootTimeStr);
+                    return (DateTime?)bootTime;
+                }
+                return null;
+            });
 
+            if (result.HasValue)
+            {
+                var span = DateTime.Now - result.Value;
                 var parts = new List<string>();
                 if (span.Days > 0) parts.Add($"{span.Days}d");
                 parts.Add($"{span.Hours}h");
                 parts.Add($"{span.Minutes}m");
                 UptimeLabel.Text = "(" + string.Join("", parts) + ")";
-                return;
             }
         }
         catch { }
     }
 
-    private void UpdateWifiSignal()
+    private async Task UpdateWifiSignalAsync()
     {
         // Strategy: Try WMI first (doesn't trigger location service).
         // If WMI works, use it as primary (refreshed every 5s).
         // If WMI fails, fall back to netsh (refreshed every 30s to avoid location icon flash).
+        // Both methods are offloaded to background thread to avoid UI freeze.
         if (!_wifiWmiTested || _wifiWmiAvailable)
         {
-            if (TryUpdateWifiViaWmi())
+            int? wmiResult = await Task.Run(() => TryReadWifiViaWmi());
+            if (wmiResult.HasValue)
             {
                 _wifiWmiAvailable = true;
                 _wifiWmiTested = true;
+                ApplyWifiSignalDbm(wmiResult.Value);
                 return;
             }
-            // WMI failed — mark as unavailable, fall through to netsh
             _wifiWmiAvailable = false;
             _wifiWmiTested = true;
         }
 
-        // Fallback: netsh wlan show interfaces
-        UpdateWifiViaNetsh();
+        // Fallback: netsh wlan show interfaces (async)
+        int? netshResult = await Task.Run(() => TryReadWifiViaNetsh());
+        if (netshResult.HasValue)
+            ApplyWifiSignalDbm(netshResult.Value);
+        else
+            SetWifiNA();
     }
 
-    private bool TryUpdateWifiViaWmi()
+    private int? TryReadWifiViaWmi()
     {
         try
         {
-            // Method 1: MSNdis_80211_ReceivedSignalStrength (signal in dBm)
             using var searcher = new ManagementObjectSearcher(
                 "root\\wmi",
                 "SELECT Ndis80211ReceivedSignalStrength FROM MSNdis_80211_ReceivedSignalStrength");
@@ -1045,24 +1037,17 @@ public partial class MainWindow : Window
                 if (signal != null)
                 {
                     int dbm = Convert.ToInt32(signal);
-                    // Typical range: -100 to -30 dBm
                     if (dbm >= -100 && dbm <= 0)
-                    {
-                        ApplyWifiSignalDbm(dbm);
-                        return true;
-                    }
+                        return dbm;
                 }
             }
         }
         catch { }
-
-        return false;
+        return null;
     }
 
-    private void UpdateWifiViaNetsh()
+    private int? TryReadWifiViaNetsh()
     {
-        // Use netsh wlan show interfaces — most reliable across Windows versions
-        // BUT triggers Windows location service (system tray icon flash)
         try
         {
             var psi = new ProcessStartInfo("netsh", "wlan show interfaces")
@@ -1074,30 +1059,24 @@ public partial class MainWindow : Window
                 StandardOutputEncoding = System.Text.Encoding.UTF8
             };
             using var proc = Process.Start(psi);
-            if (proc == null) { SetWifiNA(); return; }
+            if (proc == null) return null;
             var output = proc.StandardOutput.ReadToEnd();
             proc.WaitForExit(5000);
 
-            // Check if connected
             if (!output.Contains("connected", StringComparison.OrdinalIgnoreCase))
-            { SetWifiNA(); return; }
+                return null;
 
-            // Parse "信号" or "Signal" line: "    Signal                 : 86%"
             var match = System.Text.RegularExpressions.Regex.Match(
                 output, @"(?:信号|Signal)\s*:\s*(\d+)%",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             if (match.Success)
             {
                 int percent = int.Parse(match.Groups[1].Value);
-                int dbm = (percent / 2) - 100;  // Windows formula: percent = 2*(dBm+100)
-                ApplyWifiSignalDbm(dbm);
-            }
-            else
-            {
-                SetWifiNA();
+                return (percent / 2) - 100;
             }
         }
-        catch { SetWifiNA(); }
+        catch { }
+        return null;
     }
 
     private void ApplyWifiSignalDbm(int dbm)
