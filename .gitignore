@@ -1,6 +1,7 @@
 # Build output
 bin/
 obj/
+publish/
 
 # WebView2 runtime data
 *.WebView2/
