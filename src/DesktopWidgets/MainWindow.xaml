@@ -474,10 +474,13 @@
                                <TextBlock x:Name="PingLabel" Text="DELAY(223.5.5.5)" FontFamily="Consolas"
                                          FontSize="11" FontWeight="Bold" Foreground="#39FF14"
                                          Effect="{StaticResource CyanGlow}"/>
-                              <TextBlock x:Name="PingValue" Text="N/A" FontFamily="Consolas"
+                              <TextBlock x:Name="PingValue" FontFamily="Consolas"
                                          FontSize="13" Foreground="#39FF14"
                                          HorizontalAlignment="Right"
-                                         Effect="{StaticResource CyanGlow}"/>
+                                         Effect="{StaticResource CyanGlow}">
+                                  <Run x:Name="PingMsRun" Text="N/A"/>
+                                  <Run x:Name="PingLossRun" Text=""/>
+                              </TextBlock>
                          </DockPanel>
                          <Grid x:Name="PingBarContainer" Grid.Row="1" Height="8" Margin="0,3,0,0">
                              <Border Background="{StaticResource BarTrack}"/>

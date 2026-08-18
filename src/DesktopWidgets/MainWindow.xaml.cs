@@ -874,38 +874,41 @@ public partial class MainWindow : Window
         int lost = _pingHistory.Count - _pingHistory.Count(s => s);
         int lossPct = (int)Math.Round(100.0 * lost / _pingHistory.Count);
 
-        // Color logic: latency + loss rate together
-        bool badLatency = pingMs > 100;
-        bool midLatency = pingMs > 50;
-        bool highLoss = lossPct >= 10;
-        bool someLoss = lossPct > 0;
-
+        // Latency color (ms) — independent from loss color
+        System.Windows.Media.Brush msBrush;
         if (pingMs >= 0)
         {
-            PingValue.Text = $"{pingMs}ms L{lossPct}%";
+            if (pingMs > 100) msBrush = RedText;
+            else if (pingMs > 50) msBrush = YellowText;
+            else msBrush = FindResource("GreenBar") as System.Windows.Media.Brush ?? CyanText;
+            PingMsRun.Text = $"{pingMs}ms";
             PingFill.Width = Math.Min(1, pingMs / 200.0) * PingBarContainer.ActualWidth;
-            if (highLoss || badLatency)
-            {
-                PingFill.Fill = FindResource("RedBar") as System.Windows.Media.Brush;
-                PingValue.Foreground = RedText;
-            }
-            else if (midLatency || someLoss)
-            {
-                PingFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
-                PingValue.Foreground = YellowText;
-            }
-            else
-            {
-                PingFill.Fill = FindResource("GreenBar") as System.Windows.Media.Brush;
-                PingValue.Foreground = FindResource("GreenBar") as System.Windows.Media.Brush;
-            }
         }
         else
         {
-            PingValue.Text = $"N/A L{lossPct}%";
-            PingValue.Foreground = DimText;
+            PingMsRun.Text = "N/A";
+            msBrush = DimText;
             PingFill.Width = 0;
         }
+        PingMsRun.Foreground = msBrush;
+
+        // Loss color (%) — independent from latency color
+        System.Windows.Media.Brush lossBrush;
+        if (lossPct >= 10) lossBrush = RedText;
+        else if (lossPct > 0) lossBrush = YellowText;
+        else lossBrush = FindResource("GreenBar") as System.Windows.Media.Brush ?? CyanText;
+        PingLossRun.Text = $" L{lossPct}%";
+        PingLossRun.Foreground = lossBrush;
+
+        // Bar fill follows the WORSE of the two (latency >100ms or loss ≥10% → red bar)
+        bool highLoss = lossPct >= 10;
+        bool badLatency = pingMs > 100;
+        if (highLoss || badLatency)
+            PingFill.Fill = FindResource("RedBar") as System.Windows.Media.Brush;
+        else if (lossPct > 0 || pingMs > 50)
+            PingFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
+        else
+            PingFill.Fill = FindResource("GreenBar") as System.Windows.Media.Brush;
     }
 
     private async void UpdateIpDnsAsync()
