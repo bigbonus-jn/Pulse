@@ -53,6 +53,10 @@ public partial class MainWindow : Window
     // Ping monitoring
     private readonly System.Net.NetworkInformation.Ping _pingSender = new();
 
+    // Packet loss sliding window (last N ping results, true=success)
+    private readonly Queue<bool> _pingHistory = new();
+    private const int PingWindowSize = 12;
+
     // Pre-allocated colors & brushes (avoid GC per-tick)
     private static readonly SolidColorBrush CyanText = new(System.Windows.Media.Color.FromRgb(0x00, 0xFF, 0xF9));
     private static readonly SolidColorBrush MagentaText = new(System.Windows.Media.Color.FromRgb(0xFF, 0x2A, 0x6D));
@@ -864,16 +868,28 @@ public partial class MainWindow : Window
         catch { }
         _pingInProgress = false;
 
+        // Record result in sliding window (true = success)
+        _pingHistory.Enqueue(pingMs >= 0);
+        while (_pingHistory.Count > PingWindowSize) _pingHistory.Dequeue();
+        int lost = _pingHistory.Count - _pingHistory.Count(s => s);
+        int lossPct = (int)Math.Round(100.0 * lost / _pingHistory.Count);
+
+        // Color logic: latency + loss rate together
+        bool badLatency = pingMs > 100;
+        bool midLatency = pingMs > 50;
+        bool highLoss = lossPct >= 10;
+        bool someLoss = lossPct > 0;
+
         if (pingMs >= 0)
         {
-            PingValue.Text = $"{pingMs}ms";
+            PingValue.Text = $"{pingMs}ms L{lossPct}%";
             PingFill.Width = Math.Min(1, pingMs / 200.0) * PingBarContainer.ActualWidth;
-            if (pingMs > 100)
+            if (highLoss || badLatency)
             {
                 PingFill.Fill = FindResource("RedBar") as System.Windows.Media.Brush;
                 PingValue.Foreground = RedText;
             }
-            else if (pingMs > 50)
+            else if (midLatency || someLoss)
             {
                 PingFill.Fill = FindResource("YellowBar") as System.Windows.Media.Brush;
                 PingValue.Foreground = YellowText;
@@ -886,7 +902,7 @@ public partial class MainWindow : Window
         }
         else
         {
-            PingValue.Text = "N/A";
+            PingValue.Text = $"N/A L{lossPct}%";
             PingValue.Foreground = DimText;
             PingFill.Width = 0;
         }

@@ -3,10 +3,10 @@ AIGC:
   ContentProducer: '001191110102MAD55U9H0F10002'
   ContentPropagator: '001191110102MAD55U9H0F10002'
   Label: '1'
-  ProduceID: '6e00437e-4bb9-46f8-88ff-e1b37fd36eb6'
-  PropagateID: '6e00437e-4bb9-46f8-88ff-e1b37fd36eb6'
-  ReservedCode1: 'c89b5e4d-558b-4cc0-91bb-3357c24d9e16'
-  ReservedCode2: 'c89b5e4d-558b-4cc0-91bb-3357c24d9e16'
+  ProduceID: '6886dae4-7f96-4adb-b7ec-16ebc8558abb'
+  PropagateID: '6886dae4-7f96-4adb-b7ec-16ebc8558abb'
+  ReservedCode1: '890ff7f6-ee92-4307-b1e0-325633b8be02'
+  ReservedCode2: '890ff7f6-ee92-4307-b1e0-325633b8be02'
 ---
 
 # PULSE / 脉搏
@@ -70,6 +70,7 @@ dotnet publish src/DesktopWidgets/DesktopWidgets.csproj \
 
 | 版本 | 主要变更 |
 |------|----------|
+| v0.14 | DELAY 行新增丢包率显示（滑动窗口，`23ms L0%`） |
 | v0.13 | IP 移到底部栏、亮度提升、RSSI 标签、设置双列布局、托盘中文化、全异步化、图标重绘 |
 | v0.12 | 设置面板（监控可见性 / DELAY IP 配置 / 跟随锁定） |
 | v0.11 | 品牌重命名 DesktopWidgets → PULSE |
