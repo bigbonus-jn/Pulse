@@ -95,7 +95,7 @@ public partial class SettingsWindow : Window
         _offsetX = Left - _owner.Left;
         _offsetY = Top - _owner.Top;
 
-        double settingsWidth = 280;
+        double settingsWidth = Width;  // 320 — use actual window width
         double targetX, targetY;
 
         // Check right side first
