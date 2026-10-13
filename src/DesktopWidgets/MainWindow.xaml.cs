@@ -168,6 +168,38 @@ public partial class MainWindow : Window
     private void TopBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
         if (!_isLocked) DragMove();
+        SnapToScreenEdges();  // magnetic snap to desktop edges/corners after drag
+    }
+
+    // ── Magnetic snap to screen edges & corners ──
+    // DragMove() returns when mouse is released; then we check if the window
+    // is near a screen edge (within threshold) and snap it flush against it.
+    // Corners are handled automatically (both axes snap at once).
+    // Applies to the primary screen work area (taskbar excluded).
+    private void SnapToScreenEdges()
+    {
+        const double threshold = 20;  // snap distance in px
+        var work = SystemParameters.WorkArea;
+
+        bool nearLeft   = Left < work.Left + threshold;
+        bool nearRight  = Left + Width > work.Right - threshold;
+        bool nearTop    = Top < work.Top + threshold;
+        bool nearBottom = Top + Height > work.Bottom - threshold;
+
+        double targetLeft = Left, targetTop = Top;
+
+        if (nearLeft) targetLeft = work.Left;                    // snap flush left
+        else if (nearRight) targetLeft = work.Right - Width;     // snap flush right
+
+        if (nearTop) targetTop = work.Top;                       // snap flush top
+        else if (nearBottom) targetTop = work.Bottom - Height;   // snap flush bottom (above taskbar)
+
+        if (Math.Abs(targetLeft - Left) > 0.5 || Math.Abs(targetTop - Top) > 0.5)
+        {
+            Left = targetLeft;
+            Top = targetTop;
+            // OnLocationChanged -> config save & settings window follow automatically
+        }
     }
 
     // ── Settings entry (3 dots click — toggle open/close) ──
