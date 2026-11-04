@@ -3,10 +3,10 @@ AIGC:
   ContentProducer: '001191110102MAD55U9H0F10002'
   ContentPropagator: '001191110102MAD55U9H0F10002'
   Label: '1'
-  ProduceID: '6886dae4-7f96-4adb-b7ec-16ebc8558abb'
-  PropagateID: '6886dae4-7f96-4adb-b7ec-16ebc8558abb'
-  ReservedCode1: '890ff7f6-ee92-4307-b1e0-325633b8be02'
-  ReservedCode2: '890ff7f6-ee92-4307-b1e0-325633b8be02'
+  ProduceID: '08e35148-f43b-4ca4-8162-b15b42d629d3'
+  PropagateID: '08e35148-f43b-4ca4-8162-b15b42d629d3'
+  ReservedCode1: '24492a34-8c37-412e-b206-f62cc3564a97'
+  ReservedCode2: '24492a34-8c37-412e-b206-f62cc3564a97'
 ---
 
 # PULSE / 脉搏
@@ -70,6 +70,7 @@ dotnet publish src/DesktopWidgets/DesktopWidgets.csproj \
 
 | 版本 | 主要变更 |
 |------|----------|
+| v0.15 | 网络健康体检（设置窗口入口，检测信号/延迟/丢包/抖动/DNS/网页响应/下载，0~100 评分与建议）；主窗口屏幕边缘/角落磁吸 |
 | v0.14 | DELAY 行新增丢包率显示（滑动窗口，`23ms L0%`） |
 | v0.13 | IP 移到底部栏、亮度提升、RSSI 标签、设置双列布局、托盘中文化、全异步化、图标重绘 |
 | v0.12 | 设置面板（监控可见性 / DELAY IP 配置 / 跟随锁定） |

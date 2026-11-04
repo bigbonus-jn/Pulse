@@ -94,6 +94,39 @@
             </Setter>
         </Style>
 
+        <!-- Cyberpunk action button (health check) -->
+        <Style x:Key="HealthCheckButton" TargetType="Button">
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#00FFF9"/>
+            <Setter Property="Background" Value="#0D00FFF9"/>
+            <Setter Property="BorderBrush" Value="#6600FFF9"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="1" Padding="0,6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1A00FFF9"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#B300FFF9"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#2600FFF9"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Cyberpunk scrollbar (same as main window) -->
         <Style TargetType="ScrollBar">
             <Setter Property="OverridesDefaultStyle" Value="True"/>
@@ -198,6 +231,17 @@
                                    FontFamily="Consolas" FontSize="9" Foreground="#40FFFFFF"
                                    Margin="0,0,0,8" TextWrapping="Wrap"/>
                          <StackPanel x:Name="MonitorCheckList" Margin="0,0,0,0"/>
+
+                        <!-- Section: Network health check -->
+                        <TextBlock Text="// NETWORK" FontFamily="Consolas" FontSize="11"
+                                   Foreground="#6000FFF9" FontWeight="Bold" Margin="0,14,0,4"/>
+                        <Border Height="1" Background="#1400FFF9" Margin="0,0,0,8"/>
+                        <TextBlock Text="一键检测当前网络的完整健康度（信号 / 延迟 / 丢包 / 抖动 / DNS / 网页响应 / 下载）"
+                                   FontFamily="Consolas" FontSize="9" Foreground="#40FFFFFF"
+                                   Margin="0,0,0,8" TextWrapping="Wrap"/>
+                        <Button x:Name="NetworkCheckButton" Content="⚡ 网络健康体检"
+                                Style="{StaticResource HealthCheckButton}"
+                                Click="NetworkCheckButton_Click"/>
                     </StackPanel>
                 </ScrollViewer>
             </DockPanel>

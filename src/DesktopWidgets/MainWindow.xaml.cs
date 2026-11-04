@@ -30,8 +30,11 @@ public partial class MainWindow : Window
     private int _ipTickCounter;    // counts 1s ticks for 30s IP/DNS refresh
     private int _wifiTickCounter;  // counts 1s ticks for WiFi refresh (WMI=5s, netsh=30s)
 
-    // Battery
+    // ── Battery ──
     private bool _hasBattery;  // true if system has a battery (laptop)
+
+    /// <summary>Current WiFi RSSI in dBm, null if unavailable (e.g. wired / no adapter).</summary>
+    public int? CurrentRssiDbm { get; private set; }
 
     // WiFi signal: WMI vs netsh
     private bool _wifiWmiAvailable;  // true if WMI MSNdis_80211 works
@@ -1132,6 +1135,7 @@ public partial class MainWindow : Window
 
     private void ApplyWifiSignalDbm(int dbm)
     {
+        CurrentRssiDbm = dbm;
         // Convert dBm back to percentage for bar fill: percent = 2*(dBm+100)
         int percent = Math.Clamp(2 * (dbm + 100), 0, 100);
         WifiValue.Text = $"{dbm}dBm";
@@ -1158,6 +1162,7 @@ public partial class MainWindow : Window
 
     private void SetWifiNA()
     {
+        CurrentRssiDbm = null;
         WifiValue.Text = "N/A";
         WifiValue.Foreground = DimText;
         WifiFill.Width = 0;

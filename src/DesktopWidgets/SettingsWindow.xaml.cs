@@ -307,9 +307,40 @@ public partial class SettingsWindow : Window
         Close();
     }
 
+    // ── Network health check ──
+    private NetworkCheckWindow? _networkCheckWindow;
+
+    private void NetworkCheckButton_Click(object sender, RoutedEventArgs e)
+    {
+        // If already open, bring it to front instead of stacking duplicates
+        if (_networkCheckWindow != null && _networkCheckWindow.IsLoaded)
+        {
+            _networkCheckWindow.Activate();
+            return;
+        }
+
+        var win = new NetworkCheckWindow(_config, () => _owner.CurrentRssiDbm)
+        {
+            Topmost = _owner.Topmost,
+            Top = Top,
+            Left = Left + Width + 8   // to the right of the settings window
+        };
+        // Smart flip: if no room on the right, place to the left
+        if (win.Left + win.Width > SystemParameters.WorkArea.Right)
+            win.Left = Left - win.Width - 8;
+        // Clamp vertically into the work area
+        if (win.Top + 320 > SystemParameters.WorkArea.Bottom)
+            win.Top = Math.Max(SystemParameters.WorkArea.Top, SystemParameters.WorkArea.Bottom - 320);
+
+        win.Closed += (_, _) => { if (_networkCheckWindow == win) _networkCheckWindow = null; };
+        _networkCheckWindow = win;
+        win.Show();
+    }
+
     protected override void OnClosed(EventArgs e)
     {
         _owner.LocationChanged -= Owner_LocationChanged;
+        _networkCheckWindow?.Close();
         base.OnClosed(e);
     }
 }
