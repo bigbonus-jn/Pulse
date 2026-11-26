@@ -71,9 +71,12 @@ public partial class SettingsWindow : Window
 
     public void SyncBackgroundAlpha(double alpha)
     {
+        _syncedBgAlpha = alpha;
         if (SettingsRootBorder == null) return;
         byte a = (byte)Math.Round(alpha * 255);
         SettingsRootBorder.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(a, 0x0A, 0x0A, 0x14));
+        // Forward to the network check window so all windows share the same transparency
+        _networkCheckWindow?.SyncBackgroundAlpha(alpha);
     }
 
     public void SyncTopmost(bool pinned)
@@ -96,26 +99,31 @@ public partial class SettingsWindow : Window
         _offsetY = Top - _owner.Top;
 
         double settingsWidth = Width;  // 320 — use actual window width
+        const double gap = WindowGap;
         double targetX, targetY;
 
-        // Check right side first
-        if (_owner.Left + _owner.Width + 8 + settingsWidth <= SystemParameters.PrimaryScreenWidth)
+        // Check right side first (use work area — taskbar aware)
+        if (_owner.Left + _owner.Width + gap + settingsWidth <= SystemParameters.WorkArea.Right)
         {
-            targetX = _owner.Left + _owner.Width + 8;
+            targetX = _owner.Left + _owner.Width + gap;
         }
         else
         {
-            targetX = _owner.Left - settingsWidth - 8;
+            targetX = _owner.Left - settingsWidth - gap;
         }
         targetY = _owner.Top;
 
-        Left = targetX;
-        Top = targetY;
+        // Round to whole DIP — avoids ragged sub-pixel gaps between windows
+        Left = Math.Round(targetX);
+        Top = Math.Round(targetY);
 
         // Store offsets for future follow updates
         _offsetX = Left - _owner.Left;
         _offsetY = Top - _owner.Top;
     }
+
+    /// <summary>Uniform gap between snapped windows (px).</summary>
+    public const double WindowGap = 8;
 
     public void SnapToOwner()
     {
@@ -309,6 +317,7 @@ public partial class SettingsWindow : Window
 
     // ── Network health check ──
     private NetworkCheckWindow? _networkCheckWindow;
+    private double _syncedBgAlpha = 1.0;  // last alpha received from main window
 
     private void NetworkCheckButton_Click(object sender, RoutedEventArgs e)
     {
@@ -319,22 +328,29 @@ public partial class SettingsWindow : Window
             return;
         }
 
+        // If settings window follows the main window, re-snap the whole row first
+        // so PULSE | SETTINGS | CHECK all share the same uniform gap.
+        if (_isFollowing)
+            PositionNextToOwner();
+
         var win = new NetworkCheckWindow(_config, () => _owner.CurrentRssiDbm)
         {
             Topmost = _owner.Topmost,
-            Top = Top,
-            Left = Left + Width + 8   // to the right of the settings window
+            Top = Math.Round(Top),
+            Left = Math.Round(Left + Width + WindowGap)   // to the right of the settings window
         };
         // Smart flip: if no room on the right, place to the left
         if (win.Left + win.Width > SystemParameters.WorkArea.Right)
-            win.Left = Left - win.Width - 8;
+            win.Left = Math.Round(Left - win.Width - WindowGap);
         // Clamp vertically into the work area
-        if (win.Top + 320 > SystemParameters.WorkArea.Bottom)
-            win.Top = Math.Max(SystemParameters.WorkArea.Top, SystemParameters.WorkArea.Bottom - 320);
+        double estHeight = 380;
+        if (win.Top + estHeight > SystemParameters.WorkArea.Bottom)
+            win.Top = Math.Max(SystemParameters.WorkArea.Top, Math.Round(SystemParameters.WorkArea.Bottom - estHeight));
 
         win.Closed += (_, _) => { if (_networkCheckWindow == win) _networkCheckWindow = null; };
         _networkCheckWindow = win;
         win.Show();
+        win.SyncBackgroundAlpha(_syncedBgAlpha);  // follow main window transparency immediately
     }
 
     protected override void OnClosed(EventArgs e)

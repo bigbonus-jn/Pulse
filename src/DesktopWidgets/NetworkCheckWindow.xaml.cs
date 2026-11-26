@@ -63,6 +63,14 @@ public partial class NetworkCheckWindow : Window
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern int SetWindowLong(IntPtr hwnd, int index, int newStyle);
 
+    /// <summary>Sync background alpha with main window (follow transparency).</summary>
+    public void SyncBackgroundAlpha(double alpha)
+    {
+        if (CheckRootBorder == null) return;
+        byte a = (byte)Math.Round(alpha * 255);
+        CheckRootBorder.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(a, 0x0A, 0x0A, 0x14));
+    }
+
     private void BuildRows()
     {
         // key, display name
